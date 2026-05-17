@@ -3,6 +3,7 @@ use crate::types::*;
 use sails_rs::cell::RefCell;
 use sails_rs::gstd::msg;
 use sails_rs::prelude::*;
+use sails_rs::scale_codec::{Decode, Encode};
 
 extern crate alloc;
 use alloc::vec::Vec;
@@ -609,8 +610,44 @@ impl<'a> OrderbookService<'a> {
         payload: Vec<u8>,
         gas_limit: u64,
     ) -> Result<Vec<u8>, ContractError> {
-        let future = msg::send_for_reply_as::<Vec<u8>, Vec<u8>>(target, payload, gas_limit as u128, 0)
-            .map_err(|_| ContractError::AgentCallFailed)?;
-        future.await.map_err(|_| ContractError::AgentCallFailed)
+        let reply = msg::send_for_reply_as::<RawPayload, SailsReply<Vec<u8>>>(
+            target,
+            RawPayload(payload),
+            gas_limit as u128,
+            0,
+        )
+            .map_err(|_| ContractError::AgentCallFailed)?
+            .await
+            .map_err(|_| ContractError::AgentCallFailed)?
+            .0;
+        Ok(reply)
+    }
+
+    #[export]
+    pub async fn get_live_price(
+        &mut self,
+        symbol: String,
+    ) -> Result<PriceFeed, ContractError> {
+        let varabridge = ActorId::from(VARABRIDGE_PID);
+
+        let mut payload = "VaraBridge".encode();
+        payload.extend("GetPrice".encode());
+        payload.extend(symbol.encode());
+
+        let reply = msg::send_for_reply_as::<RawPayload, SailsReply<Option<PriceFeed>>>(
+            varabridge,
+            RawPayload(payload),
+            5_000_000_000u128,
+            0,
+        )
+            .map_err(|_| ContractError::AgentCallFailed)?
+            .await
+            .map_err(|_| ContractError::AgentCallFailed)?
+            .0;
+
+        match reply {
+            Some(price_feed) => Ok(price_feed),
+            None => Err(ContractError::BadParams),
+        }
     }
 }

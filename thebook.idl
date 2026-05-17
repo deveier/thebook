@@ -18,6 +18,15 @@ type ContractError = enum {
   AgentCallFailed,
 };
 
+type PriceFeed = struct {
+  symbol: str,
+  price_usd_micro: u64,
+  change_24h_bps: i32,
+  market_cap_usd: u64,
+  volume_24h_usd: u64,
+  updated_at_block: u32,
+};
+
 type Asset = enum {
   BTC,
   ETH,
@@ -124,6 +133,7 @@ service Orderbook {
   CallAgentService : (target: actor_id, payload: vec u8, gas_limit: u64) -> result (vec u8, ContractError);
   CancelOrder : (oid: u64) -> result (null, ContractError);
   Challenge : (opponent: actor_id, amount: u64) -> result (u32, ContractError);
+  GetLivePrice : (symbol: str) -> result (PriceFeed, ContractError);
   Join : () -> struct { u64, u64, u64, u64 };
   MarketBuy : (asset: Asset, qty: u64) -> result (str, ContractError);
   MarketSell : (asset: Asset, qty: u64) -> result (str, ContractError);
