@@ -1,0 +1,69 @@
+:root {
+  --bg-color: #0b0e11;
+  --card-bg: #1e2329;
+  --card-bg-hover: #2b3139;
+  --border-color: #363c4e;
+  --text-main: #eaecef;
+  --text-secondary: #848e9c;
+  --primary: #f0b90b;
+  --buy-green: #0ecb81;
+  --sell-red: #f6465d;
+  --sidebar-width: 240px;
+  --header-height: 64px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+input, select {
+  font-family: inherit;
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  outline: none;
+}
+
+#root {
+  display: flex;
+  min-height: 100vh;
+}
+
+.scrollable {
+  overflow-y: auto;
+}
+
+.scrollable::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollable::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}

@@ -1,0 +1,258 @@
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 300px 300px;
+  grid-template-rows: 1fr 350px;
+  grid-template-areas: 
+    "chart orderbook entry"
+    "chart trades entry";
+  gap: 16px;
+  height: calc(100vh - var(--header-height) - 48px);
+}
+
+.chartArea { grid-area: chart; }
+.orderbookArea { grid-area: orderbook; }
+.tradesArea { grid-area: trades; }
+.entryArea { grid-area: entry; }
+
+.fullHeight {
+  height: 100%;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.obHeader {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 8px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.obList {
+  display: flex;
+  flex-direction: column;
+}
+
+.obRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 4px 0;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.ask { color: var(--sell-red); }
+.bid { color: var(--buy-green); }
+
+.spread {
+  padding: 12px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  margin: 8px 0;
+}
+
+.lastPrice {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.spreadLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.entryTabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.entryTabs button {
+  padding: 8px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  position: relative;
+}
+
+.entryTabs .activeTab {
+  color: var(--primary);
+}
+
+.entryTabs .activeTab::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+}
+
+.sideButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.buyBtn, .sellBtn {
+  padding: 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.buyBtn { background: var(--buy-green); }
+.sellBtn { background: var(--card-bg-hover); color: var(--text-secondary); }
+
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.formGroup input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 4px;
+  background: var(--card-bg-hover);
+}
+
+.totalInfo {
+  display: flex;
+  justify-content: space-between;
+  margin: 24px 0;
+  font-size: 14px;
+}
+
+.headerStats {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--card-bg);
+}
+
+.marketStats {
+  display: flex;
+  gap: 24px;
+  margin-top: 12px;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.statLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.statValue {
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.positive { color: var(--buy-green); }
+.negative { color: var(--sell-red); }
+
+.inputHint {
+  font-size: 11px;
+  color: var(--primary);
+  margin-top: 4px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.inputHint:hover {
+  opacity: 0.8;
+}
+
+.assetSelector button {
+  padding: 4px 12px;
+  border-radius: 4px;
+  background: var(--card-bg-hover);
+  font-size: 12px;
+}
+
+.activeAsset {
+  background: var(--primary) !important;
+  color: #000;
+  font-weight: 600;
+}
+
+.inactive {
+  opacity: 0.4;
+  background: var(--card-bg-hover) !important;
+  color: var(--text-secondary) !important;
+}
+
+.submitBuy {
+  width: 100%;
+  padding: 14px;
+  background: var(--buy-green);
+  color: #fff;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.submitSell {
+  width: 100%;
+  padding: 14px;
+  background: var(--sell-red);
+  color: #fff;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.connectWarn {
+  font-size: 12px;
+  color: var(--sell-red);
+  text-align: center;
+  margin-top: 12px;
+}
+
+.emptyOb {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.obRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: monospace;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.obRow:hover {
+  background: var(--card-bg-hover);
+}

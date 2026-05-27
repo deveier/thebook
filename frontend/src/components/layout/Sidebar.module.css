@@ -1,0 +1,61 @@
+.sidebar {
+  width: var(--sidebar-width);
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-color);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.nav {
+  flex: 1;
+  padding: 24px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.navItem:hover {
+  background: var(--card-bg);
+  color: var(--text-main);
+}
+
+.active {
+  background: var(--card-bg);
+  color: var(--primary);
+}
+
+.footer {
+  padding: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.marketStatus {
+  background: var(--card-bg);
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.value {
+  font-weight: 600;
+  color: var(--buy-green);
+}
