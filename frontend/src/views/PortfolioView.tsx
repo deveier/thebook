@@ -6,6 +6,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { web3FromSource } from '@polkadot/extension-dapp';
 import { useToast } from '../components/ui/Toast';
 import { parseContractError } from '../lib/errors';
+import { useTxStatus, TxStatusOverlay } from '../components/ui/TxStatus';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export function PortfolioView() {
   const { portfolio, loading, refresh: refreshPortfolio } = usePortfolio();
@@ -13,6 +16,7 @@ export function PortfolioView() {
   const [orders, setOrders] = useState<any[]>([]);
   const [cancelling, setCancelling] = useState<number | null>(null);
   const { success, error } = useToast();
+  const { txState, resetTx } = useTxStatus();
 
   useEffect(() => {
     if (!program || !isReady) return;
@@ -52,9 +56,14 @@ export function PortfolioView() {
     return (
       <div className={styles.emptyState}>
         <Card title="My Portfolio">
-          <div className={styles.placeholder}>
-            {loading ? 'Loading portfolio...' : 'Please join the DEX to see your balances.'}
-          </div>
+          <EmptyState
+            title={loading ? 'Loading...' : 'Welcome to thebookdex'}
+            description={loading ? 'Loading portfolio...' : 'Join the DEX to start trading and tracking your balances.'}
+            action={!loading && account ? {
+              label: 'Join DEX',
+              onClick: () => {},
+            } : undefined}
+          />
         </Card>
       </div>
     );
@@ -68,78 +77,106 @@ export function PortfolioView() {
   ];
 
   return (
-    <div className={styles.container}>
-      <h1>My Portfolio</h1>
+    <>
+      <div className={styles.container}>
+        <h1>My Portfolio</h1>
 
-      <div className={styles.grid}>
-        <Card title="Asset Balances">
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assets.map((asset) => (
-                <tr key={asset.name}>
-                  <td className={styles.assetName}>{asset.name}</td>
-                  <td>{formatAmount(asset.amount, asset.decimals)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <div className={styles.grid}>
+          <Card title="Asset Balances">
+            {assets.every(a => Number(a.amount) === 0) ? (
+              <EmptyState
+                title="Empty Portfolio"
+                description="Deposit funds to start trading."
+                action={{ label: 'Deposit', onClick: () => {} }}
+              />
+            ) : (
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Asset</th>
+                    <th>Balance</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assets.map((asset) => (
+                    <tr key={asset.name}>
+                      <td className={styles.assetName}>{asset.name}</td>
+                      <td>{formatAmount(asset.amount, asset.decimals)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button className={styles.actionBtn} title="Deposit">
+                            <ArrowDownRight size={14} />
+                          </button>
+                          <button className={styles.actionBtn} title="Withdraw">
+                            <ArrowUpRight size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Card>
 
-        <Card title="Total Net Worth">
-            <div className={styles.netWorth}>
-                <span className={styles.netWorthValue}>
-                    ${formatAmount(portfolio.usd, 2)}
-                </span>
-                <span className={styles.netWorthLabel}>USD Balance</span>
-            </div>
-        </Card>
-      </div>
+          <Card title="Total Net Worth">
+              <div className={styles.netWorth}>
+                  <span className={styles.netWorthValue}>
+                      ${formatAmount(portfolio.usd, 2)}
+                  </span>
+                  <span className={styles.netWorthLabel}>USD Balance</span>
+              </div>
+          </Card>
+        </div>
 
-      <div className={styles.ordersSection}>
-        <Card title="Open Orders">
-          {orders.length === 0 && <div className={styles.placeholder}>No active limit orders.</div>}
-          {orders.map((o, i) => (
-            <div key={i} className={styles.orderRow}>
-              <div>
-                <span style={{ fontWeight: 600 }}>{o[1] as string} {o[2] as string}</span>
-                <span style={{ margin: '0 8px', color: 'var(--text-secondary)' }}>@</span>
-                <span>${(Number(o[3]) / 100).toFixed(2)}</span>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                  Qty: {formatAmount(o[4], 8)} / Filled: {formatAmount(o[5], 8)}
+        <div className={styles.ordersSection}>
+          <Card title="Open Orders">
+            {orders.length === 0 && (
+              <EmptyState
+                title="No Open Orders"
+                description="Place a limit order on the Trade page to see it here."
+              />
+            )}
+            {orders.map((o, i) => (
+              <div key={i} className={styles.orderRow}>
+                <div>
+                  <span style={{ fontWeight: 600 }}>{o[1] as string} {o[2] as string}</span>
+                  <span style={{ margin: '0 8px', color: 'var(--text-secondary)' }}>@</span>
+                  <span>${(Number(o[3]) / 100).toFixed(2)}</span>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    Qty: {formatAmount(o[4], 8)} / Filled: {formatAmount(o[5], 8)}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: o[6] === 'Open' ? 'var(--buy-green)' : 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>{o[6] as string}</span>
+                  {(o[6] === 'Open' || o[6] === 'Partial') && (
+                    <button
+                      onClick={() => handleCancel(o[0])}
+                      disabled={cancelling === Number(o[0])}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border-color)',
+                        background: 'transparent',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        minHeight: 36,
+                      }}
+                    >
+                      {cancelling === Number(o[0]) ? '...' : 'Cancel'}
+                    </button>
+                  )}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: o[6] === 'Open' ? 'var(--buy-green)' : 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>{o[6] as string}</span>
-                {(o[6] === 'Open' || o[6] === 'Partial') && (
-                  <button
-                    onClick={() => handleCancel(o[0])}
-                    disabled={cancelling === Number(o[0])}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: 6,
-                      border: '1px solid var(--border-color)',
-                      background: 'transparent',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 500,
-                      minHeight: 36,
-                    }}
-                  >
-                    {cancelling === Number(o[0]) ? '...' : 'Cancel'}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </Card>
+            ))}
+          </Card>
+        </div>
       </div>
-    </div>
+
+      <TxStatusOverlay state={txState} onClose={resetTx} />
+    </>
   );
 }

@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { useSails } from '../hooks/useSails';
 import { useViewport } from '../hooks/useViewport';
+import { useAccount } from '@gear-js/react-hooks';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Trophy, Medal, Award } from 'lucide-react';
 
 export function LeaderboardView() {
   const { program, isReady } = useSails();
   const [leaders, setLeaders] = useState<LeaderEntry[]>([]);
+  const { account } = useAccount();
   const { isMobile } = useViewport();
 
   useEffect(() => {
@@ -23,17 +26,25 @@ export function LeaderboardView() {
     return null;
   };
 
+  if (leaders.length === 0) {
+    return (
+      <div style={{ maxWidth: 600, margin: '0 auto' }}>
+        <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: 16 }}>Leaderboard</h1>
+        <Card title="Top Traders">
+          <EmptyState
+            title="No Traders Yet"
+            description="Start trading to top the leaderboard! The top 10 traders by PnL are ranked here."
+            action={account ? { label: 'Start Trading', onClick: () => {} } : undefined}
+          />
+        </Card>
+      </div>
+    );
+  }
+
   if (isMobile) {
     return (
       <div style={{ maxWidth: 600, margin: '0 auto' }}>
         <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: 16 }}>Leaderboard</h1>
-        {leaders.length === 0 && (
-          <Card title="Top Traders">
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-              No traders yet. Be the first!
-            </div>
-          </Card>
-        )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {leaders.map((l, i) => (
             <Card key={l.id.toString()}>
@@ -61,39 +72,30 @@ export function LeaderboardView() {
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: 24 }}>Leaderboard</h1>
-      {leaders.length === 0 && (
-        <Card title="Top Traders">
-          <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-            No traders yet. Be the first!
-          </div>
-        </Card>
-      )}
-      {leaders.length > 0 && (
-        <Card title="Top Traders">
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>#</th>
-                <th style={{ textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>Trader</th>
-                <th style={{ textAlign: 'right', padding: '12px 16px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>USD PnL</th>
-                <th style={{ textAlign: 'right', padding: '12px 16px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>Net Worth</th>
+      <Card title="Top Traders">
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>#</th>
+              <th style={{ textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>Trader</th>
+              <th style={{ textAlign: 'right', padding: '12px 16px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>USD PnL</th>
+              <th style={{ textAlign: 'right', padding: '12px 16px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>Net Worth</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaders.map((l, i) => (
+              <tr key={l.id.toString()}>
+                <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', fontWeight: 600, width: 40 }}>
+                  {rankIcon(i) || <span style={{ color: 'var(--text-secondary)' }}>{i + 1}</span>}
+                </td>
+                <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)', fontSize: 14 }}>{l.id.slice(0, 6)}...{l.id.slice(-4)}</td>
+                <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', textAlign: 'right', color: 'var(--buy-green)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>${Number(l.usd) / 100}</td>
+                <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>${Number(l.net_worth) / 100}</td>
               </tr>
-            </thead>
-            <tbody>
-              {leaders.map((l, i) => (
-                <tr key={l.id.toString()}>
-                  <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', fontWeight: 600, width: 40 }}>
-                    {rankIcon(i) || <span style={{ color: 'var(--text-secondary)' }}>{i + 1}</span>}
-                  </td>
-                  <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)', fontSize: 14 }}>{l.id.slice(0, 6)}...{l.id.slice(-4)}</td>
-                  <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', textAlign: 'right', color: 'var(--buy-green)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>${Number(l.usd) / 100}</td>
-                  <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>${Number(l.net_worth) / 100}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }

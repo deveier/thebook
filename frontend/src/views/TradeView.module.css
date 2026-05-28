@@ -189,6 +189,54 @@
   min-height: 44px;
 }
 
+.qtyRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.balanceTag {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--space-2xs) 0;
+  transition: color var(--transition-fast);
+}
+
+.balanceTag:hover {
+  color: var(--primary);
+}
+
+.balanceTagLabel {
+  font-family: var(--font-mono);
+}
+
+.presets {
+  display: flex;
+  gap: var(--space-2xs);
+  margin-top: var(--space-2xs);
+}
+
+.presetBtn {
+  flex: 1;
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg-hover);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  min-height: 28px;
+  transition: all var(--transition-fast);
+}
+
+.presetBtn:hover {
+  background: var(--primary);
+  color: #000;
+}
+
 .totalInfo {
   display: flex;
   justify-content: space-between;

@@ -74,6 +74,26 @@
   color: var(--text-secondary);
 }
 
+.actionBtn {
+  background: var(--card-bg-hover);
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  min-width: 32px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.actionBtn:hover {
+  color: var(--text-main);
+  border-color: var(--text-secondary);
+}
+
 .ordersSection {
   margin-top: var(--space-sm);
 }

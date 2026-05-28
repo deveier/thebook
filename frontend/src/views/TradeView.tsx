@@ -5,11 +5,12 @@ import { useOrderbook } from '../hooks/useOrderbook';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { useOracle } from '../hooks/useOracle';
 import { useSails } from '../hooks/useSails';
-import { web3FromSource } from '@polkadot/extension-dapp';
-import { TrendingUp, TrendingDown, BarChart3, BookOpen, ListOrdered, ShoppingCart } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, BookOpen, ListOrdered, ShoppingCart, Wallet } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 import { parseContractError } from '../lib/errors';
 import { useViewport } from '../hooks/useViewport';
+import { useTxStatus, TxStatusOverlay } from '../components/ui/TxStatus';
+import { EmptyState } from '../components/ui/EmptyState';
 
 type PanelId = 'chart' | 'orderbook' | 'trades' | 'entry';
 
@@ -30,11 +31,11 @@ export function TradeView() {
   const { isMobile } = useViewport();
 
   const { orderbook, trades, refresh: refreshOb } = useOrderbook(asset);
-  const { refresh: refreshPortfolio } = usePortfolio();
+  const { portfolio, refresh: refreshPortfolio } = usePortfolio();
   const { priceData: oracleData } = useOracle(asset);
   const { program, account } = useSails();
   const { success, error } = useToast();
-  const [txLoading, setTxLoading] = useState(false);
+  const { txState, executeTx, resetTx } = useTxStatus();
 
   const handlePlaceOrder = async () => {
     if (!program || !account || !qty) return;
@@ -50,33 +51,29 @@ export function TradeView() {
         return;
       }
     }
-    setTxLoading(true);
-    try {
-      const { signer } = await web3FromSource(account.meta.source);
-      const q = BigInt(Math.round(parsedQty * 10**8));
-      let transaction;
 
-      if (orderType === 'Market') {
-        transaction = program.orderbook.marketSell(asset, q);
-      } else {
+    const q = BigInt(Math.round(parsedQty * 10**8));
+
+    const ok = await executeTx(
+      () => {
+        if (orderType === 'Market') {
+          return program!.orderbook.marketSell(asset, q);
+        }
         const p = BigInt(Math.round(parseFloat(price) * 100));
-        transaction = program.orderbook.placeLimit(side, asset, p, q);
+        return program!.orderbook.placeLimit(side, asset, p, q);
+      },
+      account,
+      () => {
+        setPrice('');
+        setQty('');
+        refreshOb();
+        refreshPortfolio();
+        success('Order placed successfully!');
       }
+    );
 
-      await transaction.withAccount(account.address, { signer }).calculateGas();
-      const { response } = await transaction.signAndSend();
-      await response();
-
-      success('Order placed successfully!');
-      setPrice('');
-      setQty('');
-      refreshOb();
-      refreshPortfolio();
-    } catch (e) {
-      console.error('Order placement failed:', e);
-      error(parseContractError(e));
-    } finally {
-      setTxLoading(false);
+    if (!ok) {
+      error(parseContractError(txState.errorMsg));
     }
   };
 
@@ -97,6 +94,44 @@ export function TradeView() {
     const diff = Number(lastPrice - oraclePriceCents) / Number(oraclePriceCents) * 100;
     return diff;
   }, [lastPrice, oraclePriceCents]);
+
+  const availableBalance = useMemo(() => {
+    if (!portfolio) return { value: 0n, label: '$0.00', decimals: 2 };
+    if (orderType === 'Market' || side === 'Sell') {
+      const amt = asset === 'BTC' ? portfolio.btc : asset === 'ETH' ? portfolio.eth : portfolio.vara;
+      const decimals = asset === 'ETH' ? 6 : 8;
+      const formatted = (Number(amt) / 10**decimals).toLocaleString(undefined, { maximumFractionDigits: 6 });
+      return { value: amt, label: formatted, decimals };
+    }
+    return { value: portfolio.usd, label: `$${(Number(portfolio.usd) / 100).toLocaleString()}`, decimals: 2 };
+  }, [portfolio, side, orderType, asset]);
+
+  const applyPreset = (pct: number) => {
+    if (!portfolio) return;
+    let maxVal: bigint;
+    let divisor: number;
+    if (orderType === 'Market' || side === 'Sell') {
+      maxVal = availableBalance.value;
+      divisor = 10 ** availableBalance.decimals;
+    } else {
+      maxVal = portfolio.usd;
+      divisor = 100;
+    }
+    const maxNumber = Number(maxVal) / divisor;
+    const preset = (maxNumber * pct) / 100;
+    const priceVal = orderType === 'Limit' ? parseFloat(price) : 0;
+    if (orderType === 'Limit' && side === 'Buy' && priceVal > 0) {
+      setQty((preset / priceVal).toFixed(minDecimals(preset / priceVal)));
+    } else {
+      setQty(preset.toFixed(minDecimals(preset)));
+    }
+  };
+
+  function minDecimals(n: number): number {
+    if (n >= 1) return 4;
+    if (n >= 0.01) return 6;
+    return 8;
+  }
 
   const chartPanel = (
     <Card title={`${asset} / USD Chart`} className={styles.fullHeight}>
@@ -158,7 +193,12 @@ export function TradeView() {
         <span>Total</span>
       </div>
       <div className={styles.obList}>
-        {orderbook.asks.length === 0 && <div className={styles.emptyOb}>No Asks</div>}
+        {orderbook.asks.length === 0 && orderbook.bids.length === 0 && (
+          <EmptyState
+            title="No Orders Yet"
+            description="Be the first to place an order! Click a price below to fill the order form."
+          />
+        )}
         {orderbook.asks.slice(0, 10).reverse().map(([p, q], i) => (
           <div key={i} className={`${styles.obRow} ${styles.ask}`}
             style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
@@ -172,7 +212,6 @@ export function TradeView() {
           <span className={styles.lastPrice}>{lastPrice ? (Number(lastPrice)/100).toFixed(2) : '---'}</span>
           <span className={styles.spreadLabel}>Last Price</span>
         </div>
-        {orderbook.bids.length === 0 && <div className={styles.emptyOb}>No Bids</div>}
         {orderbook.bids.slice(0, 10).map(([p, q], i) => (
           <div key={i} className={`${styles.obRow} ${styles.bid}`}
             style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
@@ -231,7 +270,24 @@ export function TradeView() {
       )}
       <div className={styles.formGroup}>
         <label>Quantity ({asset})</label>
-        <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="0.00" />
+        <div className={styles.qtyRow}>
+          <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="0.00" />
+          {account && portfolio && (
+            <div className={styles.balanceTag} onClick={() => applyPreset(100)}>
+              <Wallet size={12} />
+              <span className={styles.balanceTagLabel}>Balance: {availableBalance.label}</span>
+            </div>
+          )}
+        </div>
+        {account && portfolio && Number(availableBalance.value) > 0 && (
+          <div className={styles.presets}>
+            {[25, 50, 75, 100].map(pct => (
+              <button key={pct} className={styles.presetBtn} onClick={() => applyPreset(pct)}>
+                {pct}%
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {orderType === 'Limit' && (
         <div className={styles.totalInfo}>
@@ -242,9 +298,9 @@ export function TradeView() {
       <button
         className={orderType === 'Market' ? styles.submitSell : (side === 'Buy' ? styles.submitBuy : styles.submitSell)}
         onClick={handlePlaceOrder}
-        disabled={txLoading || !account}
+        disabled={txState.visible && txState.stage !== 'failed' && txState.stage !== 'confirmed'}
       >
-        {txLoading ? 'Processing...' : orderType === 'Market' ? `Market Sell ${asset}` : `${side} ${asset}`}
+        {txState.stage === 'broadcasting' || txState.stage === 'confirming' ? 'Processing...' : orderType === 'Market' ? `Market Sell ${asset}` : `${side} ${asset}`}
       </button>
       {!account && <div className={styles.connectWarn}>Connect wallet to trade</div>}
     </Card>
@@ -258,7 +314,12 @@ export function TradeView() {
         <span>Time</span>
       </div>
       <div className={styles.obList}>
-        {trades.length === 0 && <div className={styles.emptyOb}>No recent trades</div>}
+        {trades.length === 0 && (
+          <EmptyState
+            title="No Trades Yet"
+            description="Trades will appear here once orders are matched."
+          />
+        )}
         {trades.map((t, i) => (
           <div key={i} className={styles.obRow}>
             <span className={styles.buyText}>{(Number(t.price)/100).toFixed(2)}</span>
@@ -294,6 +355,7 @@ export function TradeView() {
           {mobilePanel === 'trades' && tradesPanel}
           {mobilePanel === 'entry' && entryPanel}
         </div>
+        <TxStatusOverlay state={txState} onClose={resetTx} />
       </div>
     );
   }
@@ -315,6 +377,8 @@ export function TradeView() {
       <div className={styles.tradesArea}>
         {tradesPanel}
       </div>
+
+      <TxStatusOverlay state={txState} onClose={resetTx} />
     </div>
   );
 }
