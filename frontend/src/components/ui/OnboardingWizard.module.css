@@ -1,0 +1,207 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: var(--space-md);
+  backdrop-filter: blur(6px);
+}
+
+.modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  max-width: 460px;
+  width: 100%;
+  position: relative;
+  animation: fadeIn var(--transition-base) ease-out;
+  overflow: hidden;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.closeBtn {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  min-height: 36px;
+  min-width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  z-index: 10;
+}
+
+.closeBtn:hover {
+  color: var(--text-main);
+  background: var(--card-bg-hover);
+}
+
+.stepsBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-lg) 0;
+}
+
+.stepDot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: 1;
+  max-width: 80px;
+}
+
+.dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--card-bg-hover);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all var(--transition-fast);
+}
+
+.done .dot {
+  background: var(--buy-green);
+  color: #fff;
+}
+
+.current .dot {
+  background: var(--primary);
+  color: #000;
+}
+
+.dotLabel {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.done .dotLabel {
+  color: var(--buy-green);
+}
+
+.current .dotLabel {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-xl) var(--space-lg);
+  text-align: center;
+  gap: var(--space-md);
+}
+
+.iconWrap {
+  margin-bottom: var(--space-xs);
+}
+
+.rocket {
+  color: var(--primary);
+}
+
+.iconAccent {
+  color: var(--primary);
+}
+
+.checkCircle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--buy-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.desc {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 340px;
+}
+
+.primaryBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: var(--primary);
+  color: #000;
+  padding: var(--space-sm) var(--space-xl);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  min-height: 48px;
+  transition: opacity var(--transition-fast);
+  margin-top: var(--space-sm);
+}
+
+.primaryBtn:hover {
+  opacity: 0.9;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.skipBtn {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-md);
+}
+
+.skipBtn:hover {
+  color: var(--text-main);
+}
+
+.footer {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 0 var(--space-lg) var(--space-lg);
+  opacity: 0.6;
+}
+
+@media (max-width: 767px) {
+  .modal {
+    max-width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .stepsBar {
+    gap: var(--space-sm);
+  }
+
+  .content {
+    padding: var(--space-lg) var(--space-md);
+  }
+}

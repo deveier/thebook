@@ -1,6 +1,8 @@
 import { lazy, Suspense, useState } from 'react';
 import { Layout } from './components/layout/Layout';
 import { SkeletonCard } from './components/ui/Skeleton';
+import { OnboardingWizard } from './components/ui/OnboardingWizard';
+import { useOnboarding } from './hooks/useOnboarding';
 
 const TradeView = lazy(() => import('./views/TradeView').then(m => ({ default: m.TradeView })));
 const SwapView = lazy(() => import('./views/SwapView').then(m => ({ default: m.SwapView })));
@@ -18,6 +20,7 @@ function PageLoader() {
 
 function App() {
   const [activeTab, setActiveTab] = useState('trade');
+  const { showWizard, completeOnboarding, dismissWizard } = useOnboarding();
 
   const renderContent = () => {
     switch (activeTab) {
@@ -37,11 +40,21 @@ function App() {
   };
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-      <Suspense fallback={<PageLoader />}>
-        {renderContent()}
-      </Suspense>
-    </Layout>
+    <>
+      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+        <Suspense fallback={<PageLoader />}>
+          {renderContent()}
+        </Suspense>
+      </Layout>
+
+      {showWizard && (
+        <OnboardingWizard
+          onComplete={completeOnboarding}
+          onDismiss={dismissWizard}
+          onNavigateToTab={setActiveTab}
+        />
+      )}
+    </>
   );
 }
 
