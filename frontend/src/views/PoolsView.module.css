@@ -1,17 +1,21 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-lg);
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
 }
 
 .header h1 {
-  font-size: 24px;
+  font-size: var(--font-size-xl);
   font-weight: 700;
   color: var(--text-main);
 }
@@ -19,11 +23,42 @@
 .createBtn {
   background: var(--primary);
   color: #000;
-  padding: 10px 20px;
-  border-radius: 8px;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
   font-weight: 600;
+  font-size: var(--font-size-sm);
+  min-height: 44px;
 }
 
+.createForm {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.createForm select {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font-size: var(--font-size-sm);
+  min-height: 44px;
+}
+
+.createForm button {
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--primary);
+  color: #000;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  min-height: 44px;
+}
+
+/* ── Desktop: Table ── */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -31,39 +66,77 @@
 
 .table th {
   text-align: left;
-  padding: 12px 16px;
-  font-size: 12px;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-xs);
   color: var(--text-secondary);
   text-transform: uppercase;
   border-bottom: 1px solid var(--border-color);
 }
 
 .table td {
-  padding: 16px;
+  padding: var(--space-md);
   border-bottom: 1px solid var(--border-color);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .pair {
   font-weight: 600;
 }
 
-.apr {
-  color: var(--buy-green);
-  font-weight: 600;
-}
-
 .actionBtn {
   background: var(--card-bg-hover);
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 13px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
   color: var(--text-main);
   border: 1px solid var(--border-color);
+  min-height: 36px;
+}
+
+/* ── Mobile: Card list instead of table ── */
+@media (max-width: 767px) {
+  .table thead {
+    display: none;
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+  }
+
+  .table tr {
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .table tr:last-child {
+    border-bottom: none;
+  }
+
+  .table td {
+    padding: var(--space-2xs) 0;
+    border-bottom: none;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: var(--space-2xs);
+  }
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
 }
 
 .placeholder {
-  padding: 40px;
+  padding: var(--space-2xl);
   text-align: center;
   color: var(--text-secondary);
   font-style: italic;

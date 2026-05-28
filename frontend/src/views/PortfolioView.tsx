@@ -45,7 +45,7 @@ export function PortfolioView() {
      const n = Number(val);
      if (isNaN(n)) return '0.00';
      const divisor = 10 ** decimals;
-     return (n / divisor).toLocaleString(undefined, { minimumFractionDigits: 2 });
+     return (n / divisor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: decimals });
   };
 
   if (!portfolio) {
@@ -105,7 +105,7 @@ export function PortfolioView() {
         <Card title="Open Orders">
           {orders.length === 0 && <div className={styles.placeholder}>No active limit orders.</div>}
           {orders.map((o, i) => (
-            <div key={i} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div key={i} className={styles.orderRow}>
               <div>
                 <span style={{ fontWeight: 600 }}>{o[1] as string} {o[2] as string}</span>
                 <span style={{ margin: '0 8px', color: 'var(--text-secondary)' }}>@</span>
@@ -121,14 +121,15 @@ export function PortfolioView() {
                     onClick={() => handleCancel(o[0])}
                     disabled={cancelling === Number(o[0])}
                     style={{
-                      padding: '4px 12px',
+                      padding: '6px 14px',
                       borderRadius: 6,
                       border: '1px solid var(--border-color)',
                       background: 'transparent',
                       color: 'var(--text-secondary)',
                       cursor: 'pointer',
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: 500,
+                      minHeight: 36,
                     }}
                   >
                     {cancelling === Number(o[0]) ? '...' : 'Cancel'}

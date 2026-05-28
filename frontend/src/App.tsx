@@ -1,10 +1,20 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Layout } from './components/layout/Layout';
-import { TradeView } from './views/TradeView';
-import { SwapView } from './views/SwapView';
-import { PoolsView } from './views/PoolsView';
-import { PortfolioView } from './views/PortfolioView';
-import { LeaderboardView } from './views/LeaderboardView';
+import { SkeletonCard } from './components/ui/Skeleton';
+
+const TradeView = lazy(() => import('./views/TradeView').then(m => ({ default: m.TradeView })));
+const SwapView = lazy(() => import('./views/SwapView').then(m => ({ default: m.SwapView })));
+const PoolsView = lazy(() => import('./views/PoolsView').then(m => ({ default: m.PoolsView })));
+const PortfolioView = lazy(() => import('./views/PortfolioView').then(m => ({ default: m.PortfolioView })));
+const LeaderboardView = lazy(() => import('./views/LeaderboardView').then(m => ({ default: m.LeaderboardView })));
+
+function PageLoader() {
+  return (
+    <div style={{ padding: 24 }}>
+      <SkeletonCard lines={6} />
+    </div>
+  );
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState('trade');
@@ -28,7 +38,9 @@ function App() {
 
   return (
     <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-      {renderContent()}
+      <Suspense fallback={<PageLoader />}>
+        {renderContent()}
+      </Suspense>
     </Layout>
   );
 }

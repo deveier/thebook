@@ -6,9 +6,19 @@ import { usePortfolio } from '../hooks/usePortfolio';
 import { useOracle } from '../hooks/useOracle';
 import { useSails } from '../hooks/useSails';
 import { web3FromSource } from '@polkadot/extension-dapp';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, BookOpen, ListOrdered, ShoppingCart } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 import { parseContractError } from '../lib/errors';
+import { useViewport } from '../hooks/useViewport';
+
+type PanelId = 'chart' | 'orderbook' | 'trades' | 'entry';
+
+const mobilePanels: { id: PanelId; label: string; icon: React.ElementType }[] = [
+  { id: 'chart', label: 'Chart', icon: BarChart3 },
+  { id: 'orderbook', label: 'Orderbook', icon: BookOpen },
+  { id: 'trades', label: 'Trades', icon: ListOrdered },
+  { id: 'entry', label: 'Entry', icon: ShoppingCart },
+];
 
 export function TradeView() {
   const [asset, setAsset] = useState<Asset>('BTC');
@@ -16,6 +26,8 @@ export function TradeView() {
   const [side, setSide] = useState<Side>('Buy');
   const [price, setPrice] = useState('');
   const [qty, setQty] = useState('');
+  const [mobilePanel, setMobilePanel] = useState<PanelId>('chart');
+  const { isMobile } = useViewport();
 
   const { orderbook, trades, refresh: refreshOb } = useOrderbook(asset);
   const { refresh: refreshPortfolio } = usePortfolio();
@@ -86,178 +98,222 @@ export function TradeView() {
     return diff;
   }, [lastPrice, oraclePriceCents]);
 
+  const chartPanel = (
+    <Card title={`${asset} / USD Chart`} className={styles.fullHeight}>
+      <div className={styles.headerStats}>
+         <div className={styles.assetSelector}>
+            {['BTC', 'ETH', 'VARA'].map(a => (
+              <button
+                key={a}
+                className={asset === a ? styles.activeAsset : ''}
+                onClick={() => setAsset(a as Asset)}
+              >
+                {a}
+              </button>
+            ))}
+         </div>
+         <div className={styles.marketStats}>
+            <div className={styles.statItem}>
+                <span className={styles.statLabel}>DEX Price</span>
+                <span className={styles.statValue}>${lastPrice ? (Number(lastPrice)/100).toFixed(2) : trades.length === 0 ? 'No trades yet' : '---'}</span>
+            </div>
+            <div className={styles.statItem}>
+                <span className={styles.statLabel}>Oracle Price</span>
+                <span className={styles.statValue}>
+                  {account
+                    ? (oraclePriceMicro
+                      ? <>${(Number(oraclePriceMicro)/1_000_000).toFixed(2)}
+                          {oracleData?.change_24h_bps !== undefined && (
+                            <span className={Number(oracleData.change_24h_bps) >= 0 ? styles.positive : styles.negative} style={{ fontSize: 12, marginLeft: 4 }}>
+                              {Number(oracleData.change_24h_bps) >= 0 ? '+' : ''}{(Number(oracleData.change_24h_bps) / 100).toFixed(2)}%
+                            </span>
+                          )}
+                        </>
+                      : 'Loading...')
+                    : 'Connect wallet'}
+                </span>
+            </div>
+            {priceDiff !== null && (
+                <div className={`${styles.statItem} ${priceDiff > 0 ? styles.positive : styles.negative}`}>
+                    <span className={styles.statLabel}>Arb Opportunity</span>
+                    <span className={styles.statValue}>
+                        {priceDiff > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                        {Math.abs(priceDiff).toFixed(2)}%
+                    </span>
+                </div>
+            )}
+         </div>
+      </div>
+      <div className={styles.placeholder}>
+         Chart Visualization (Coming Soon)
+      </div>
+    </Card>
+  );
+
+  const orderbookPanel = (
+    <Card title="Orderbook" className={styles.fullHeight}>
+      <div className={styles.obHeader}>
+        <span>Price</span>
+        <span>Qty</span>
+        <span>Total</span>
+      </div>
+      <div className={styles.obList}>
+        {orderbook.asks.length === 0 && <div className={styles.emptyOb}>No Asks</div>}
+        {orderbook.asks.slice(0, 10).reverse().map(([p, q], i) => (
+          <div key={i} className={`${styles.obRow} ${styles.ask}`}
+            style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
+            onClick={() => setPrice((Number(p)/100).toString())}>
+            <span>{(Number(p)/100).toFixed(2)}</span>
+            <span>{(Number(q)/10**8).toFixed(4)}</span>
+            <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
+          </div>
+        ))}
+        <div className={styles.spread}>
+          <span className={styles.lastPrice}>{lastPrice ? (Number(lastPrice)/100).toFixed(2) : '---'}</span>
+          <span className={styles.spreadLabel}>Last Price</span>
+        </div>
+        {orderbook.bids.length === 0 && <div className={styles.emptyOb}>No Bids</div>}
+        {orderbook.bids.slice(0, 10).map(([p, q], i) => (
+          <div key={i} className={`${styles.obRow} ${styles.bid}`}
+            style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
+            onClick={() => setPrice((Number(p)/100).toString())}>
+            <span>{(Number(p)/100).toFixed(2)}</span>
+            <span>{(Number(q)/10**8).toFixed(4)}</span>
+            <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+
+  const entryPanel = (
+    <Card title="Place Order">
+      <div className={styles.orderTypeTabs}>
+        <button
+          className={orderType === 'Limit' ? styles.activeType : ''}
+          onClick={() => setOrderType('Limit')}
+        >
+          Limit
+        </button>
+        <button
+          className={orderType === 'Market' ? styles.activeType : ''}
+          onClick={() => setOrderType('Market')}
+        >
+          Market
+        </button>
+      </div>
+      {orderType === 'Limit' && (
+        <div className={styles.sideButtons}>
+          <button
+            className={`${styles.buyBtn} ${side === 'Buy' ? '' : styles.inactive}`}
+            onClick={() => setSide('Buy')}
+          >
+            Buy
+          </button>
+          <button
+            className={`${styles.sellBtn} ${side === 'Sell' ? '' : styles.inactive}`}
+            onClick={() => setSide('Sell')}
+          >
+            Sell
+          </button>
+        </div>
+      )}
+      {orderType === 'Limit' && (
+        <div className={styles.formGroup}>
+          <label>Price (USD)</label>
+          <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" />
+          {oraclePriceMicro > 0n && (
+              <div className={styles.inputHint} onClick={() => setPrice((Number(oraclePriceMicro)/1_000_000).toString())}>
+                  Oracle: ${(Number(oraclePriceMicro)/1_000_000).toFixed(2)}
+              </div>
+          )}
+        </div>
+      )}
+      <div className={styles.formGroup}>
+        <label>Quantity ({asset})</label>
+        <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="0.00" />
+      </div>
+      {orderType === 'Limit' && (
+        <div className={styles.totalInfo}>
+          <span>Est. Total:</span>
+          <span>${((parseFloat(price || '0') * parseFloat(qty || '0')) || 0).toFixed(2)}</span>
+        </div>
+      )}
+      <button
+        className={orderType === 'Market' ? styles.submitSell : (side === 'Buy' ? styles.submitBuy : styles.submitSell)}
+        onClick={handlePlaceOrder}
+        disabled={txLoading || !account}
+      >
+        {txLoading ? 'Processing...' : orderType === 'Market' ? `Market Sell ${asset}` : `${side} ${asset}`}
+      </button>
+      {!account && <div className={styles.connectWarn}>Connect wallet to trade</div>}
+    </Card>
+  );
+
+  const tradesPanel = (
+    <Card title="Recent Trades" className={styles.fullHeight}>
+       <div className={styles.obHeader}>
+        <span>Price</span>
+        <span>Qty</span>
+        <span>Time</span>
+      </div>
+      <div className={styles.obList}>
+        {trades.length === 0 && <div className={styles.emptyOb}>No recent trades</div>}
+        {trades.map((t, i) => (
+          <div key={i} className={styles.obRow}>
+            <span className={styles.buyText}>{(Number(t.price)/100).toFixed(2)}</span>
+            <span>{(Number(t.qty)/10**8).toFixed(4)}</span>
+            <span>{t.time}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+
+  if (isMobile) {
+    return (
+      <div className={styles.mobileContainer}>
+        <div className={styles.mobileTabs}>
+          {mobilePanels.map(p => {
+            const Icon = p.icon;
+            return (
+              <button
+                key={p.id}
+                className={`${styles.mobileTab} ${mobilePanel === p.id ? styles.mobileTabActive : ''}`}
+                onClick={() => setMobilePanel(p.id)}
+              >
+                <Icon size={16} />
+                <span>{p.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className={styles.mobilePanel}>
+          {mobilePanel === 'chart' && chartPanel}
+          {mobilePanel === 'orderbook' && orderbookPanel}
+          {mobilePanel === 'trades' && tradesPanel}
+          {mobilePanel === 'entry' && entryPanel}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.grid}>
       <div className={styles.chartArea}>
-        <Card title={`${asset} / USD Chart`} className={styles.fullHeight}>
-          <div className={styles.headerStats}>
-             <div className={styles.assetSelector}>
-                {['BTC', 'ETH', 'VARA'].map(a => (
-                  <button
-                    key={a}
-                    className={asset === a ? styles.activeAsset : ''}
-                    onClick={() => setAsset(a as Asset)}
-                  >
-                    {a}
-                  </button>
-                ))}
-             </div>
-             <div className={styles.marketStats}>
-                <div className={styles.statItem}>
-                    <span className={styles.statLabel}>DEX Price</span>
-                    <span className={styles.statValue}>${lastPrice ? (Number(lastPrice)/100).toFixed(2) : trades.length === 0 ? 'No trades yet' : '---'}</span>
-                </div>
-                <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Oracle Price</span>
-                    <span className={styles.statValue}>
-                      {account
-                        ? (oraclePriceMicro
-                          ? <>${(Number(oraclePriceMicro)/1_000_000).toFixed(2)}
-                              {oracleData?.change_24h_bps !== undefined && (
-                                <span className={Number(oracleData.change_24h_bps) >= 0 ? styles.positive : styles.negative} style={{ fontSize: 12, marginLeft: 4 }}>
-                                  {Number(oracleData.change_24h_bps) >= 0 ? '+' : ''}{(Number(oracleData.change_24h_bps) / 100).toFixed(2)}%
-                                </span>
-                              )}
-                            </>
-                          : 'Loading...')
-                        : 'Connect wallet'}
-                    </span>
-                </div>
-                {priceDiff !== null && (
-                    <div className={`${styles.statItem} ${priceDiff > 0 ? styles.positive : styles.negative}`}>
-                        <span className={styles.statLabel}>Arb Opportunity</span>
-                        <span className={styles.statValue}>
-                            {priceDiff > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                            {Math.abs(priceDiff).toFixed(2)}%
-                        </span>
-                    </div>
-                )}
-             </div>
-          </div>
-          <div className={styles.placeholder}>
-             Chart Visualization (Coming Soon)
-          </div>
-        </Card>
+        {chartPanel}
       </div>
 
       <div className={styles.orderbookArea}>
-        <Card title="Orderbook" className={styles.fullHeight}>
-          <div className={styles.obHeader}>
-            <span>Price</span>
-            <span>Qty</span>
-            <span>Total</span>
-          </div>
-          <div className={styles.obList}>
-            {orderbook.asks.length === 0 && <div className={styles.emptyOb}>No Asks</div>}
-            {orderbook.asks.slice(0, 10).reverse().map(([p, q], i) => (
-              <div key={i} className={`${styles.obRow} ${styles.ask}`}
-                style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
-                onClick={() => setPrice((Number(p)/100).toString())}>
-                <span>{(Number(p)/100).toFixed(2)}</span>
-                <span>{(Number(q)/10**8).toFixed(4)}</span>
-                <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
-              </div>
-            ))}
-            <div className={styles.spread}>
-              <span className={styles.lastPrice}>{lastPrice ? (Number(lastPrice)/100).toFixed(2) : '---'}</span>
-              <span className={styles.spreadLabel}>Last Price</span>
-            </div>
-            {orderbook.bids.length === 0 && <div className={styles.emptyOb}>No Bids</div>}
-            {orderbook.bids.slice(0, 10).map(([p, q], i) => (
-              <div key={i} className={`${styles.obRow} ${styles.bid}`}
-                style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
-                onClick={() => setPrice((Number(p)/100).toString())}>
-                <span>{(Number(p)/100).toFixed(2)}</span>
-                <span>{(Number(q)/10**8).toFixed(4)}</span>
-                <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
+        {orderbookPanel}
       </div>
 
       <div className={styles.entryArea}>
-        <Card title="Place Order">
-          <div className={styles.orderTypeTabs}>
-            <button
-              className={orderType === 'Limit' ? styles.activeType : ''}
-              onClick={() => setOrderType('Limit')}
-            >
-              Limit
-            </button>
-            <button
-              className={orderType === 'Market' ? styles.activeType : ''}
-              onClick={() => setOrderType('Market')}
-            >
-              Market
-            </button>
-          </div>
-          {orderType === 'Limit' && (
-            <div className={styles.sideButtons}>
-              <button
-                className={`${styles.buyBtn} ${side === 'Buy' ? '' : styles.inactive}`}
-                onClick={() => setSide('Buy')}
-              >
-                Buy
-              </button>
-              <button
-                className={`${styles.sellBtn} ${side === 'Sell' ? '' : styles.inactive}`}
-                onClick={() => setSide('Sell')}
-              >
-                Sell
-              </button>
-            </div>
-          )}
-          {orderType === 'Limit' && (
-            <div className={styles.formGroup}>
-              <label>Price (USD)</label>
-              <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" />
-              {oraclePriceMicro > 0n && (
-                  <div className={styles.inputHint} onClick={() => setPrice((Number(oraclePriceMicro)/1_000_000).toString())}>
-                      Oracle: ${(Number(oraclePriceMicro)/1_000_000).toFixed(2)}
-                  </div>
-              )}
-            </div>
-          )}
-          <div className={styles.formGroup}>
-            <label>Quantity ({asset})</label>
-            <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="0.00" />
-          </div>
-          {orderType === 'Limit' && (
-            <div className={styles.totalInfo}>
-              <span>Est. Total:</span>
-              <span>${((parseFloat(price || '0') * parseFloat(qty || '0')) || 0).toFixed(2)}</span>
-            </div>
-          )}
-          <button
-            className={orderType === 'Market' ? styles.submitSell : (side === 'Buy' ? styles.submitBuy : styles.submitSell)}
-            onClick={handlePlaceOrder}
-            disabled={txLoading || !account}
-          >
-            {txLoading ? 'Processing...' : orderType === 'Market' ? `Market Sell ${asset}` : `${side} ${asset}`}
-          </button>
-          {!account && <div className={styles.connectWarn}>Connect wallet to trade</div>}
-        </Card>
+        {entryPanel}
       </div>
 
       <div className={styles.tradesArea}>
-        <Card title="Recent Trades" className={styles.fullHeight}>
-           <div className={styles.obHeader}>
-            <span>Price</span>
-            <span>Qty</span>
-            <span>Time</span>
-          </div>
-          <div className={styles.obList}>
-            {trades.length === 0 && <div className={styles.emptyOb}>No recent trades</div>}
-            {trades.map((t, i) => (
-              <div key={i} className={styles.obRow}>
-                <span className={styles.buyText}>{(Number(t.price)/100).toFixed(2)}</span>
-                <span>{(Number(t.qty)/10**8).toFixed(4)}</span>
-                <span>{t.time}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
+        {tradesPanel}
       </div>
     </div>
   );

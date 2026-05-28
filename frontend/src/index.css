@@ -1,4 +1,5 @@
 :root {
+  /* ── Colors ── */
   --bg-color: #0b0e11;
   --card-bg: #1e2329;
   --card-bg-hover: #2b3139;
@@ -8,22 +9,71 @@
   --primary: #f0b90b;
   --buy-green: #0ecb81;
   --sell-red: #f6465d;
+
+  /* ── Layout ── */
   --sidebar-width: 240px;
+  --sidebar-collapsed-width: 60px;
   --header-height: 64px;
+  --bottom-nav-height: 64px;
+
+  /* ── Spacing Scale ── */
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* ── Typography ── */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'IBM Plex Mono', 'Menlo', monospace;
+  --font-size-xs: clamp(10px, 0.6rem + 0.1vw, 12px);
+  --font-size-sm: clamp(12px, 0.7rem + 0.15vw, 14px);
+  --font-size-base: clamp(14px, 0.85rem + 0.2vw, 16px);
+  --font-size-lg: clamp(16px, 1rem + 0.25vw, 20px);
+  --font-size-xl: clamp(20px, 1.25rem + 0.3vw, 24px);
+  --font-size-2xl: clamp(24px, 1.5rem + 0.5vw, 32px);
+
+  /* ── Border Radius ── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+
+  /* ── Transitions ── */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+
+  /* ── Breakpoints (for reference only, use @media) ── */
+  /* --bp-sm: 640px; */
+  /* --bp-md: 768px; */
+  /* --bp-lg: 1024px; */
+  /* --bp-xl: 1280px; */
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
   background-color: var(--bg-color);
   color: var(--text-main);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  overflow-x: hidden;
 }
 
 a {
@@ -36,19 +86,27 @@ button {
   border: none;
   background: none;
   font-family: inherit;
+  font-size: inherit;
+  min-height: 44px;
 }
 
-input, select {
+input, select, textarea {
   font-family: inherit;
+  font-size: inherit;
   background: none;
   border: 1px solid var(--border-color);
   color: var(--text-main);
   outline: none;
 }
 
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary);
+}
+
 #root {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .scrollable {
@@ -66,4 +124,49 @@ input, select {
 .scrollable::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 2px;
+}
+
+/* ── Utility Classes ── */
+.text-mono { font-family: var(--font-mono); }
+.text-secondary { color: var(--text-secondary); }
+.text-positive { color: var(--buy-green); }
+.text-negative { color: var(--sell-red); }
+.text-primary { color: var(--primary); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Focus Visible (keyboard navigation) ── */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Skip to Content (for screen readers) ── */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 8px;
+  background: var(--primary);
+  color: #000;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 600;
+  z-index: 10000;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -7,19 +7,22 @@
   flex-direction: column;
   gap: 8px;
   pointer-events: none;
+  max-width: min(380px, calc(100vw - 32px));
 }
 
 .toast {
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-size: 14px;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
   font-weight: 500;
   color: #fff;
-  animation: slideIn 0.25s ease-out;
+  animation: slideIn var(--transition-base) ease-out;
   pointer-events: auto;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  max-width: 380px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   word-break: break-word;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .success { background: #16a34a; }
@@ -27,6 +30,21 @@
 .info { background: #2563eb; }
 
 @keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 767px) {
+  .container {
+    top: 8px;
+    right: 8px;
+    left: 8px;
+    max-width: none;
+  }
 }

@@ -1,16 +1,22 @@
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.card:hover {
+  border-color: rgba(240, 185, 11, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .header {
-  padding: 12px 16px;
+  padding: var(--space-sm) var(--space-md);
   border-bottom: 1px solid var(--border-color);
-  font-size: 14px;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -19,5 +25,11 @@
 
 .body {
   flex: 1;
-  padding: 16px;
+  padding: var(--space-md);
+}
+
+@media (max-width: 767px) {
+  .body {
+    padding: var(--space-sm);
+  }
 }

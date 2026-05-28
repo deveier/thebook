@@ -1,6 +1,6 @@
 .header {
   height: var(--header-height);
-  padding: 0 24px;
+  padding: 0 var(--space-md);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -9,36 +9,58 @@
   position: sticky;
   top: 0;
   z-index: 100;
+  gap: var(--space-sm);
 }
 
 .logo {
-  font-size: 24px;
+  font-size: var(--font-size-xl);
   font-weight: 700;
   letter-spacing: -0.5px;
+  white-space: nowrap;
 }
 
 .accent {
   color: var(--primary);
 }
 
+.menuBtn {
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  margin-left: calc(var(--space-sm) * -1);
+  flex-shrink: 0;
+}
+
+.menuBtn:hover {
+  color: var(--text-main);
+  background: var(--card-bg-hover);
+}
+
 .actions {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: var(--space-sm);
+  flex-shrink: 0;
 }
 
 .status {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .online { background-color: var(--buy-green); box-shadow: 0 0 8px var(--buy-green); }
@@ -47,13 +69,15 @@
 .connectButton {
   background: var(--primary);
   color: #000;
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
   font-weight: 600;
+  font-size: var(--font-size-sm);
   display: flex;
   align-items: center;
-  gap: 8px;
-  transition: opacity 0.2s;
+  gap: var(--space-xs);
+  transition: opacity var(--transition-fast);
+  white-space: nowrap;
 }
 
 .connectButton:hover {
@@ -63,43 +87,51 @@
 .accountInfo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
 }
 
 .balanceInfo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-xs);
   background: var(--card-bg-hover);
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
 }
 
 .balanceLabel {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--text-secondary);
 }
 
 .balanceValue {
   font-weight: 700;
   color: var(--primary);
-  font-family: var(--mono);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
 }
 
 .joinButton {
   background: var(--buy-green);
   color: #fff;
-  padding: 8px 12px;
-  border-radius: 4px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
 }
 
 .joinButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 767px) {
+  .header {
+    padding: 0 var(--space-sm);
+  }
 }

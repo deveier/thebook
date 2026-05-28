@@ -1,16 +1,22 @@
 import { useAccount, useApi } from '@gear-js/react-hooks';
 import { web3Accounts, web3Enable } from '@polkadot/extension-dapp';
-import { Wallet, UserPlus } from 'lucide-react';
+import { Wallet, UserPlus, Menu } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import styles from './Header.module.css';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { useToast } from '../ui/Toast';
+import { useViewport } from '../../hooks/useViewport';
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { account, login, logout } = useAccount();
   const { isApiReady } = useApi();
   const { portfolio, join, loading } = usePortfolio();
   const { success, error } = useToast();
+  const { isMobile } = useViewport();
   const prevPortfolio = useRef(portfolio);
 
   useEffect(() => {
@@ -43,16 +49,23 @@ export function Header() {
 
   return (
     <header className={styles.header}>
+      {isMobile && (
+        <button onClick={onMenuClick} className={styles.menuBtn} aria-label="Open menu">
+          <Menu size={22} />
+        </button>
+      )}
       <div className={styles.logo}>
         <span className={styles.accent}>the</span>bookdex
       </div>
       <div className={styles.actions}>
-        <div className={styles.status}>
-          <div className={`${styles.dot} ${isApiReady ? styles.online : styles.offline}`} />
-          {isApiReady ? 'Vara Mainnet' : 'Connecting...'}
-        </div>
+        {!isMobile && (
+          <div className={styles.status}>
+            <div className={`${styles.dot} ${isApiReady ? styles.online : styles.offline}`} />
+            {isApiReady ? 'Vara Mainnet' : 'Connecting...'}
+          </div>
+        )}
 
-        {account && (
+        {account && !isMobile && (
           <div className={styles.balanceInfo}>
             <span className={styles.balanceLabel}>Balance:</span>
             <span className={styles.balanceValue}>
@@ -66,16 +79,21 @@ export function Header() {
             {!portfolio && (
                <button onClick={join} className={styles.joinButton} disabled={loading}>
                 <UserPlus size={16} />
-                {loading ? 'Joining...' : 'Join DEX'}
+                {loading ? 'Joining...' : isMobile ? 'Join' : 'Join DEX'}
               </button>
             )}
-            <span className={styles.address}>{account.decodedAddress.slice(0, 6)}...{account.decodedAddress.slice(-4)}</span>
+            {!isMobile && (
+              <span className={styles.address}>{account.decodedAddress.slice(0, 6)}...{account.decodedAddress.slice(-4)}</span>
+            )}
+            {isMobile && (
+              <span className={styles.address}>{account.decodedAddress.slice(0, 4)}...{account.decodedAddress.slice(-2)}</span>
+            )}
             <button onClick={logout} className={styles.connectButton}>Disconnect</button>
           </div>
         ) : (
           <button onClick={handleConnect} className={styles.connectButton}>
             <Wallet size={18} />
-            Connect Wallet
+            {isMobile ? 'Connect' : 'Connect Wallet'}
           </button>
         )}
       </div>

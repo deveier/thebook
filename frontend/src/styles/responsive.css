@@ -1,0 +1,79 @@
+/* ── Responsive Breakpoint Utilities ── */
+/* Usage: @media (--sm) { ... } requires PostCSS custom media, so we use standard @media */
+
+/* Breakpoint reference:
+   --bp-sm: 640px  – large phones
+   --bp-md: 768px  – tablets portrait
+   --bp-lg: 1024px – tablets landscape / small laptops
+   --bp-xl: 1280px – desktops
+*/
+
+/* ── Visibility Helpers ── */
+.show-mobile { display: none; }
+.show-tablet { display: none; }
+.show-desktop { display: revert; }
+.hide-mobile { display: revert; }
+.hide-tablet { display: revert; }
+.hide-desktop { display: none; }
+
+@media (max-width: 767px) {
+  .show-mobile { display: revert; }
+  .show-tablet { display: none; }
+  .show-desktop { display: none; }
+  .hide-mobile { display: none; }
+  .hide-tablet { display: revert; }
+  .hide-desktop { display: revert; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .show-mobile { display: none; }
+  .show-tablet { display: revert; }
+  .show-desktop { display: none; }
+  .hide-mobile { display: revert; }
+  .hide-tablet { display: none; }
+  .hide-desktop { display: revert; }
+}
+
+@media (min-width: 1024px) {
+  .show-mobile { display: none; }
+  .show-tablet { display: none; }
+  .show-desktop { display: revert; }
+  .hide-mobile { display: revert; }
+  .hide-tablet { display: revert; }
+  .hide-desktop { display: none; }
+}
+
+/* ── Container Padding ── */
+.container-padding {
+  padding: var(--space-md);
+}
+
+@media (min-width: 768px) {
+  .container-padding {
+    padding: var(--space-lg);
+  }
+}
+
+@media (min-width: 1280px) {
+  .container-padding {
+    padding: var(--space-xl);
+  }
+}
+
+/* ── Touch Target ── */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Safe Area (notch-aware) ── */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}

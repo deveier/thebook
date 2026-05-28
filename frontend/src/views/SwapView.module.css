@@ -2,9 +2,17 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
+  gap: var(--space-lg);
   max-width: 480px;
-  margin: 40px auto;
+  margin: 0 auto;
+  padding: var(--space-lg) 0;
+}
+
+@media (max-width: 767px) {
+  .container {
+    padding: var(--space-md) 0;
+    max-width: 100%;
+  }
 }
 
 .swapCard {
@@ -13,45 +21,49 @@
 
 .inputGroup {
   background: var(--card-bg-hover);
-  padding: 16px;
-  border-radius: 12px;
-  margin-bottom: 4px;
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-2xs);
 }
 
 .inputHeader {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-xs);
 }
 
 .inputRow {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
 }
 
 .amountInput {
   flex: 1;
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-weight: 600;
   border: none;
   background: none;
+  min-height: 44px;
+  font-family: var(--font-mono);
 }
 
 .assetSelect {
   background: var(--card-bg);
-  padding: 6px 12px;
+  padding: var(--space-xs) var(--space-sm);
   border-radius: 20px;
   font-weight: 600;
+  font-size: var(--font-size-sm);
   border: 1px solid var(--border-color);
+  min-height: 44px;
 }
 
 .divider {
   display: flex;
   justify-content: center;
-  margin: -12px 0;
+  margin: calc(var(--space-sm) * -1) 0;
   position: relative;
   z-index: 10;
 }
@@ -60,33 +72,38 @@
   background: var(--card-bg);
   border: 4px solid var(--bg-color);
   border-radius: 50%;
-  padding: 4px;
+  padding: var(--space-2xs);
   color: var(--primary);
 }
 
 .priceInfo {
-  margin: 20px 0;
+  margin: var(--space-lg) 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 
 .infoRow {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--text-secondary);
 }
 
 .swapBtn {
   width: 100%;
-  padding: 16px;
+  padding: var(--space-md);
   background: var(--primary);
   color: #000;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-weight: 700;
-  font-size: 18px;
-  margin-top: 8px;
+  font-size: var(--font-size-lg);
+  margin-top: var(--space-xs);
+}
+
+.swapBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .details {
@@ -96,6 +113,6 @@
 .statRow {
   display: flex;
   justify-content: space-between;
-  padding: 8px 0;
-  font-size: 14px;
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
 }
