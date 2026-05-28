@@ -4,6 +4,8 @@ import styles from './SwapView.module.css';
 import { useState, useEffect, useCallback } from 'react';
 import { useSails } from '../hooks/useSails';
 import { web3FromSource } from '@polkadot/extension-dapp';
+import { useToast } from '../components/ui/Toast';
+import { parseContractError } from '../lib/errors';
 
 export function SwapView() {
   const { program, account, isReady } = useSails();
@@ -12,6 +14,7 @@ export function SwapView() {
   const [toAsset, setToAsset] = useState('ETH');
   const [amountIn, setAmountIn] = useState('');
   const [amountOut, setAmountOut] = useState('');
+  const { success, error } = useToast();
   const [txLoading, setTxLoading] = useState(false);
 
   useEffect(() => {
@@ -58,12 +61,12 @@ export function SwapView() {
       await tx.withAccount(account.address, { signer }).calculateGas();
       const { response } = await tx.signAndSend();
       await response();
-      alert('Swap executed!');
+      success('Swap executed!');
       setAmountIn('');
       setAmountOut('');
     } catch (e) {
       console.error('Swap failed:', e);
-      alert('Swap failed.');
+      error(parseContractError(e));
     } finally {
       setTxLoading(false);
     }

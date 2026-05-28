@@ -1,18 +1,29 @@
 import { useAccount, useApi } from '@gear-js/react-hooks';
 import { web3Accounts, web3Enable } from '@polkadot/extension-dapp';
 import { Wallet, UserPlus } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import styles from './Header.module.css';
 import { usePortfolio } from '../../hooks/usePortfolio';
+import { useToast } from '../ui/Toast';
 
 export function Header() {
   const { account, login, logout } = useAccount();
   const { isApiReady } = useApi();
   const { portfolio, join, loading } = usePortfolio();
+  const { success, error } = useToast();
+  const prevPortfolio = useRef(portfolio);
+
+  useEffect(() => {
+    if (!prevPortfolio.current && portfolio) {
+      success('Joined the DEX successfully!');
+    }
+    prevPortfolio.current = portfolio;
+  }, [portfolio]);
 
   const handleConnect = async () => {
     const extensions = await web3Enable('thebookdex');
     if (extensions.length === 0) {
-      alert('No extension installed');
+      error('No wallet extension installed');
       return;
     }
     const allAccounts = await web3Accounts();
@@ -26,7 +37,7 @@ export function Header() {
     }
   };
 
-  const formatUsd = (val: bigint) => {
+  const formatUsd = (val: bigint | number | string) => {
     return (Number(val) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 });
   };
 

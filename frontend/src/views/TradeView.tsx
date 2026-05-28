@@ -7,9 +7,12 @@ import { useOracle } from '../hooks/useOracle';
 import { useSails } from '../hooks/useSails';
 import { web3FromSource } from '@polkadot/extension-dapp';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { useToast } from '../components/ui/Toast';
+import { parseContractError } from '../lib/errors';
 
 export function TradeView() {
   const [asset, setAsset] = useState<Asset>('BTC');
+  const [orderType, setOrderType] = useState<'Limit' | 'Market'>('Limit');
   const [side, setSide] = useState<Side>('Buy');
   const [price, setPrice] = useState('');
   const [qty, setQty] = useState('');
@@ -18,36 +21,48 @@ export function TradeView() {
   const { refresh: refreshPortfolio } = usePortfolio();
   const { priceData: oracleData } = useOracle(asset);
   const { program, account } = useSails();
+  const { success, error } = useToast();
   const [txLoading, setTxLoading] = useState(false);
 
   const handlePlaceOrder = async () => {
-    if (!program || !account || !price || !qty) return;
-    const parsedPrice = parseFloat(price);
+    if (!program || !account || !qty) return;
     const parsedQty = parseFloat(qty);
-    if (isNaN(parsedPrice) || parsedPrice <= 0 || isNaN(parsedQty) || parsedQty <= 0) {
-      alert('Invalid price or quantity');
+    if (isNaN(parsedQty) || parsedQty <= 0) {
+      error('Invalid quantity');
       return;
+    }
+    if (orderType === 'Limit') {
+      const parsedPrice = parseFloat(price);
+      if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        error('Invalid price');
+        return;
+      }
     }
     setTxLoading(true);
     try {
       const { signer } = await web3FromSource(account.meta.source);
-      const p = BigInt(Math.round(parsedPrice * 100));
       const q = BigInt(Math.round(parsedQty * 10**8));
+      let transaction;
 
-      const transaction = program.orderbook.placeLimit(side, asset, p, q);
+      if (orderType === 'Market') {
+        transaction = program.orderbook.marketSell(asset, q);
+      } else {
+        const p = BigInt(Math.round(parseFloat(price) * 100));
+        transaction = program.orderbook.placeLimit(side, asset, p, q);
+      }
+
       await transaction.withAccount(account.address, { signer }).calculateGas();
-
       const { response } = await transaction.signAndSend();
       await response();
 
-      alert('Order placed successfully!');
+      success('Order placed successfully!');
       setPrice('');
       setQty('');
       refreshOb();
       refreshPortfolio();
     } catch (e) {
       console.error('Order placement failed:', e);
-      alert('Failed to place order.');
+      error(parseContractError(e));
     } finally {
       setTxLoading(false);
     }
@@ -56,6 +71,14 @@ export function TradeView() {
   const lastPrice = trades.length > 0 ? trades[0].price : 0n;
   const oraclePriceMicro = oracleData ? BigInt(oracleData.price_usd_micro) : 0n;
   const oraclePriceCents = oraclePriceMicro / 10000n;
+  const maxQty = useMemo(() => {
+    let m = 0n;
+    for (const [, q] of [...orderbook.asks, ...orderbook.bids]) {
+      const n = typeof q === 'bigint' ? q : BigInt(String(q));
+      if (n > m) m = n;
+    }
+    return m;
+  }, [orderbook]);
   
   const priceDiff = useMemo(() => {
     if (!lastPrice || !oraclePriceCents) return null;
@@ -86,7 +109,19 @@ export function TradeView() {
                 </div>
                 <div className={styles.statItem}>
                     <span className={styles.statLabel}>Oracle Price</span>
-                    <span className={styles.statValue}>{account ? (oraclePriceMicro ? '$' + (Number(oraclePriceMicro)/1_000_000).toFixed(2) : 'Loading...') : 'Connect wallet'}</span>
+                    <span className={styles.statValue}>
+                      {account
+                        ? (oraclePriceMicro
+                          ? <>${(Number(oraclePriceMicro)/1_000_000).toFixed(2)}
+                              {oracleData?.change_24h_bps !== undefined && (
+                                <span className={Number(oracleData.change_24h_bps) >= 0 ? styles.positive : styles.negative} style={{ fontSize: 12, marginLeft: 4 }}>
+                                  {Number(oracleData.change_24h_bps) >= 0 ? '+' : ''}{(Number(oracleData.change_24h_bps) / 100).toFixed(2)}%
+                                </span>
+                              )}
+                            </>
+                          : 'Loading...')
+                        : 'Connect wallet'}
+                    </span>
                 </div>
                 {priceDiff !== null && (
                     <div className={`${styles.statItem} ${priceDiff > 0 ? styles.positive : styles.negative}`}>
@@ -115,7 +150,9 @@ export function TradeView() {
           <div className={styles.obList}>
             {orderbook.asks.length === 0 && <div className={styles.emptyOb}>No Asks</div>}
             {orderbook.asks.slice(0, 10).reverse().map(([p, q], i) => (
-              <div key={i} className={`${styles.obRow} ${styles.ask}`} onClick={() => setPrice((Number(p)/100).toString())}>
+              <div key={i} className={`${styles.obRow} ${styles.ask}`}
+                style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
+                onClick={() => setPrice((Number(p)/100).toString())}>
                 <span>{(Number(p)/100).toFixed(2)}</span>
                 <span>{(Number(q)/10**8).toFixed(4)}</span>
                 <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
@@ -127,7 +164,9 @@ export function TradeView() {
             </div>
             {orderbook.bids.length === 0 && <div className={styles.emptyOb}>No Bids</div>}
             {orderbook.bids.slice(0, 10).map(([p, q], i) => (
-              <div key={i} className={`${styles.obRow} ${styles.bid}`} onClick={() => setPrice((Number(p)/100).toString())}>
+              <div key={i} className={`${styles.obRow} ${styles.bid}`}
+                style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
+                onClick={() => setPrice((Number(p)/100).toString())}>
                 <span>{(Number(p)/100).toFixed(2)}</span>
                 <span>{(Number(q)/10**8).toFixed(4)}</span>
                 <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
@@ -139,43 +178,63 @@ export function TradeView() {
 
       <div className={styles.entryArea}>
         <Card title="Place Order">
-          <div className={styles.sideButtons}>
+          <div className={styles.orderTypeTabs}>
             <button
-              className={`${styles.buyBtn} ${side === 'Buy' ? '' : styles.inactive}`}
-              onClick={() => setSide('Buy')}
+              className={orderType === 'Limit' ? styles.activeType : ''}
+              onClick={() => setOrderType('Limit')}
             >
-              Buy
+              Limit
             </button>
             <button
-              className={`${styles.sellBtn} ${side === 'Sell' ? '' : styles.inactive}`}
-              onClick={() => setSide('Sell')}
+              className={orderType === 'Market' ? styles.activeType : ''}
+              onClick={() => setOrderType('Market')}
             >
-              Sell
+              Market
             </button>
           </div>
-          <div className={styles.formGroup}>
-            <label>Price (USD)</label>
-            <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" />
-            {oraclePriceMicro > 0n && (
-                <div className={styles.inputHint} onClick={() => setPrice((Number(oraclePriceMicro)/1_000_000).toString())}>
-                    Oracle: ${(Number(oraclePriceMicro)/1_000_000).toFixed(2)}
-                </div>
-            )}
-          </div>
+          {orderType === 'Limit' && (
+            <div className={styles.sideButtons}>
+              <button
+                className={`${styles.buyBtn} ${side === 'Buy' ? '' : styles.inactive}`}
+                onClick={() => setSide('Buy')}
+              >
+                Buy
+              </button>
+              <button
+                className={`${styles.sellBtn} ${side === 'Sell' ? '' : styles.inactive}`}
+                onClick={() => setSide('Sell')}
+              >
+                Sell
+              </button>
+            </div>
+          )}
+          {orderType === 'Limit' && (
+            <div className={styles.formGroup}>
+              <label>Price (USD)</label>
+              <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" />
+              {oraclePriceMicro > 0n && (
+                  <div className={styles.inputHint} onClick={() => setPrice((Number(oraclePriceMicro)/1_000_000).toString())}>
+                      Oracle: ${(Number(oraclePriceMicro)/1_000_000).toFixed(2)}
+                  </div>
+              )}
+            </div>
+          )}
           <div className={styles.formGroup}>
             <label>Quantity ({asset})</label>
             <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="0.00" />
           </div>
-          <div className={styles.totalInfo}>
-            <span>Est. Total:</span>
-            <span>${((parseFloat(price || '0') * parseFloat(qty || '0')) || 0).toFixed(2)}</span>
-          </div>
+          {orderType === 'Limit' && (
+            <div className={styles.totalInfo}>
+              <span>Est. Total:</span>
+              <span>${((parseFloat(price || '0') * parseFloat(qty || '0')) || 0).toFixed(2)}</span>
+            </div>
+          )}
           <button
-            className={side === 'Buy' ? styles.submitBuy : styles.submitSell}
+            className={orderType === 'Market' ? styles.submitSell : (side === 'Buy' ? styles.submitBuy : styles.submitSell)}
             onClick={handlePlaceOrder}
             disabled={txLoading || !account}
           >
-            {txLoading ? 'Processing...' : `${side} ${asset}`}
+            {txLoading ? 'Processing...' : orderType === 'Market' ? `Market Sell ${asset}` : `${side} ${asset}`}
           </button>
           {!account && <div className={styles.connectWarn}>Connect wallet to trade</div>}
         </Card>

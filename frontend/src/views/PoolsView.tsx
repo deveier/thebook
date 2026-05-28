@@ -3,6 +3,8 @@ import styles from './PoolsView.module.css';
 import { useState, useEffect, useRef } from 'react';
 import { useSails } from '../hooks/useSails';
 import { web3FromSource } from '@polkadot/extension-dapp';
+import { useToast } from '../components/ui/Toast';
+import { parseContractError } from '../lib/errors';
 
 export function PoolsView() {
   const { program, account, isReady } = useSails();
@@ -11,6 +13,7 @@ export function PoolsView() {
   const [showCreate, setShowCreate] = useState(false);
   const [newA, setNewA] = useState<Asset>('BTC');
   const [newB, setNewB] = useState<Asset>('ETH');
+  const { success, error } = useToast();
   const [txLoading, setTxLoading] = useState(false);
   const mountedRef = useRef(true);
 
@@ -41,12 +44,12 @@ export function PoolsView() {
       await tx.withAccount(account.address, { signer }).calculateGas();
       const { response } = await tx.signAndSend();
       await response();
-      alert('Pool created!');
+      success('Pool created!');
       setShowCreate(false);
-      program.amm.listPools().call().then(r => { if (r) setPools(r as Pool[]); });
+      program.amm.listPools().call().then(r => { if (r && mountedRef.current) setPools(r as Pool[]); });
     } catch (e) {
       console.error('Create pool failed:', e);
-      alert('Failed to create pool.');
+      error(parseContractError(e));
     } finally {
       setTxLoading(false);
     }

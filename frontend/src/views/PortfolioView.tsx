@@ -2,12 +2,17 @@ import { Card } from '../components/ui/Card';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { useSails } from '../hooks/useSails';
 import styles from './PortfolioView.module.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { web3FromSource } from '@polkadot/extension-dapp';
+import { useToast } from '../components/ui/Toast';
+import { parseContractError } from '../lib/errors';
 
 export function PortfolioView() {
-  const { portfolio, loading } = usePortfolio();
-  const { program, isReady } = useSails();
+  const { portfolio, loading, refresh: refreshPortfolio } = usePortfolio();
+  const { program, account, isReady } = useSails();
   const [orders, setOrders] = useState<any[]>([]);
+  const [cancelling, setCancelling] = useState<number | null>(null);
+  const { success, error } = useToast();
 
   useEffect(() => {
     if (!program || !isReady) return;
@@ -16,8 +21,28 @@ export function PortfolioView() {
     }).catch(console.error);
   }, [program, isReady]);
 
+  const handleCancel = useCallback(async (oid: number | string | bigint) => {
+    if (!program || !account) return;
+    setCancelling(Number(oid));
+    try {
+      const { signer } = await web3FromSource(account.meta.source);
+      const tx = program.orderbook.cancelOrder(oid);
+      await tx.withAccount(account.address, { signer }).calculateGas();
+      const { response } = await tx.signAndSend();
+      await response();
+      success('Order cancelled');
+      setOrders(prev => prev.filter((o: any) => Number(o[0]) !== Number(oid)));
+      refreshPortfolio();
+    } catch (e) {
+      console.error('Cancel failed:', e);
+      error(parseContractError(e));
+    } finally {
+      setCancelling(null);
+    }
+  }, [program, account, success, error, refreshPortfolio]);
+
   const formatAmount = (val: bigint | number | string, decimals: number = 2) => {
-     const n = typeof val === 'bigint' ? Number(val) : Number(val);
+     const n = Number(val);
      if (isNaN(n)) return '0.00';
      const divisor = 10 ** decimals;
      return (n / divisor).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -80,10 +105,36 @@ export function PortfolioView() {
         <Card title="Open Orders">
           {orders.length === 0 && <div className={styles.placeholder}>No active limit orders.</div>}
           {orders.map((o, i) => (
-            <div key={i} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>{o[1] as string} {o[2] as string} @ {Number(o[3]) / 100}</span>
-              <span style={{ color: 'var(--text-secondary)' }}>Qty: {Number(o[4]) / 10**8} / Filled: {Number(o[5]) / 10**8}</span>
-              <span style={{ color: 'var(--buy-green)' }}>{o[6] as string}</span>
+            <div key={i} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontWeight: 600 }}>{o[1] as string} {o[2] as string}</span>
+                <span style={{ margin: '0 8px', color: 'var(--text-secondary)' }}>@</span>
+                <span>${(Number(o[3]) / 100).toFixed(2)}</span>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                  Qty: {formatAmount(o[4], 8)} / Filled: {formatAmount(o[5], 8)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: o[6] === 'Open' ? 'var(--buy-green)' : 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase' }}>{o[6] as string}</span>
+                {(o[6] === 'Open' || o[6] === 'Partial') && (
+                  <button
+                    onClick={() => handleCancel(o[0])}
+                    disabled={cancelling === Number(o[0])}
+                    style={{
+                      padding: '4px 12px',
+                      borderRadius: 6,
+                      border: '1px solid var(--border-color)',
+                      background: 'transparent',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {cancelling === Number(o[0]) ? '...' : 'Cancel'}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </Card>

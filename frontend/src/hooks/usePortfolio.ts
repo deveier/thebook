@@ -54,7 +54,6 @@ export function usePortfolio() {
       await fetchPortfolio();
     } catch (e) {
       console.error('Join failed:', e);
-      alert('Join failed. See console for details.');
     } finally {
       setLoading(false);
     }

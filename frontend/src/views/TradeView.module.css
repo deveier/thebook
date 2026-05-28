@@ -41,14 +41,6 @@
   flex-direction: column;
 }
 
-.obRow {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  padding: 4px 0;
-  font-size: 13px;
-  font-family: monospace;
-}
-
 .ask { color: var(--sell-red); }
 .bid { color: var(--buy-green); }
 
@@ -228,6 +220,28 @@
   font-size: 16px;
 }
 
+.orderTypeTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.orderTypeTabs button {
+  padding: 8px;
+  border-radius: 4px;
+  background: var(--card-bg-hover);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.orderTypeTabs .activeType {
+  background: var(--primary);
+  color: #000;
+  font-weight: 600;
+}
+
 .connectWarn {
   font-size: 12px;
   color: var(--sell-red);
@@ -251,6 +265,27 @@
   font-family: monospace;
   cursor: pointer;
   transition: background 0.1s;
+  position: relative;
+}
+
+.obRow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  opacity: 0.12;
+  pointer-events: none;
+  width: var(--depth, 0%);
+}
+
+.ask::before {
+  right: 0;
+  background: var(--sell-red);
+}
+
+.bid::before {
+  left: 0;
+  background: var(--buy-green);
 }
 
 .obRow:hover {
