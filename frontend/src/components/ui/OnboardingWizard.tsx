@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useAccount } from '@gear-js/react-hooks';
 import { web3Enable, web3Accounts } from '@polkadot/extension-dapp';
+import { decodeAddress } from '@polkadot/util-crypto';
+import { u8aToHex } from '@polkadot/util';
 import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { useToast } from './Toast';
@@ -49,7 +51,7 @@ export function OnboardingWizard({ onComplete, onDismiss, onNavigateToTab }: Onb
       const acc = allAccounts[0];
       login({
         ...acc,
-        decodedAddress: acc.address as `0x${string}`,
+        decodedAddress: u8aToHex(decodeAddress(acc.address)),
         signer: exts[0].signer,
       });
     } catch (e: any) {

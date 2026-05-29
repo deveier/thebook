@@ -11,7 +11,7 @@ import { useMarketData } from '../providers/MarketDataProvider';
 
 export function SwapView() {
   const { program, account } = useSails();
-  const { pools, loading: marketLoading } = useMarketData();
+  const { pools, loading: marketLoading, pricesStale, pricesLoading, fetchPrices } = useMarketData();
   const [fromAsset, setFromAsset] = useState('VARA');
   const [toAsset, setToAsset] = useState('ETH');
   const [amountIn, setAmountIn] = useState('');
@@ -46,6 +46,10 @@ export function SwapView() {
 
   const handleSwap = async () => {
     if (!program || !account || !activePool || !amountIn) return;
+    if (pricesStale) {
+      error('Oracle price is stale. Refresh prices from the ticker or TradeView first.');
+      return;
+    }
     const parsedIn = parseFloat(amountIn);
     const parsedOut = parseFloat(amountOut);
     if (isNaN(parsedIn) || parsedIn <= 0) return;

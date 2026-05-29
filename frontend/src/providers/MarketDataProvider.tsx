@@ -97,6 +97,16 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
 
   const pricesStale = lastFetched !== null && Date.now() - lastFetched > STALE_MS;
 
+  /* Periodic staleness check — every 30s, re-fetch if stale */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (lastFetched !== null && Date.now() - lastFetched > STALE_MS && account && !fetchingRef.current) {
+        fetchPrices();
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [lastFetched, account, fetchPrices]);
+
   /* Fetch public data: orderbook + trades + pools + leaderboard */
   useEffect(() => {
     if (!program) return;

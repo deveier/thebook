@@ -1,5 +1,7 @@
 import { useAccount, useApi } from '@gear-js/react-hooks';
 import { web3Accounts, web3Enable } from '@polkadot/extension-dapp';
+import { decodeAddress } from '@polkadot/util-crypto';
+import { u8aToHex } from '@polkadot/util';
 import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 import { Wallet, UserPlus, Menu, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
@@ -49,7 +51,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       const acc = allAccounts[0];
       login({
         ...acc,
-        decodedAddress: acc.address as `0x${string}`,
+        decodedAddress: u8aToHex(decodeAddress(acc.address)),
         signer: exts[0].signer,
       });
       return;
@@ -61,7 +63,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     web3Enable('thebookdex').then(exts => {
       login({
         ...acc,
-        decodedAddress: acc.address as `0x${string}`,
+        decodedAddress: u8aToHex(decodeAddress(acc.address)),
         signer: exts[0].signer,
       });
     });
@@ -107,7 +109,8 @@ export function Header({ onMenuClick }: HeaderProps) {
         {!isMobile && (
           <div className={styles.ticker}>
             {priceTicker.map(({ asset, data }) => (
-              <div key={asset} className={styles.tickerItem}>
+              <button key={asset} className={styles.tickerItem} onClick={handleRefreshPrices} disabled={pricesLoading}
+                title="Click to sign a tx & refresh oracle prices">
                 <span className={styles.tickerAsset}>{asset}</span>
                 <span className={styles.tickerPrice}>
                   {data?.price_usd_micro
@@ -122,7 +125,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                     {(Number(data.change_24h_bps) / 100).toFixed(2)}%
                   </span>
                 )}
-              </div>
+              </button>
             ))}
             {lastFetched !== null && pricesStale && (
               <button className={styles.staleBtn} onClick={handleRefreshPrices} disabled={pricesLoading}

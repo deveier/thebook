@@ -34,6 +34,13 @@ export function TradeView() {
   const [asset, setAsset] = useState<Asset>('BTC');
   const [orderType, setOrderType] = useState<'Limit' | 'Market'>('Limit');
   const [side, setSide] = useState<Side>('Buy');
+
+  const handleAssetChange = (a: Asset) => {
+    setAsset(a);
+    if (pricesStale && account && !pricesLoading) {
+      fetchPrices();
+    }
+  };
   const [price, setPrice] = useState('');
   const [qty, setQty] = useState('');
   const [mobilePanel, setMobilePanel] = useState<PanelId>('chart');
@@ -109,6 +116,10 @@ export function TradeView() {
 
   const handlePlaceOrder = async () => {
     if (!program || !account || !qty) return;
+    if (pricesStale) {
+      error('Oracle price is stale. Click the oracle price icon to sign a refresh tx first.');
+      return;
+    }
     const parsedQty = parseFloat(qty);
     if (isNaN(parsedQty) || parsedQty <= 0) {
       error('Invalid quantity');
@@ -150,13 +161,19 @@ export function TradeView() {
   };
 
   const renderPrice = () => {
-    if (oraclePrice > 0) {
-      return <>${oraclePrice.toFixed(2)}</>;
-    }
     if (!account) return 'Connect wallet';
+    if (oraclePrice > 0) {
+      const staleTitle = lastFetched ? `Price is stale (${fmtTimeAgo(lastFetched)}). Click to sign a tx & refresh.` : 'Click to refresh price';
+      return (
+        <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading} title={staleTitle}>
+          ${oraclePrice.toFixed(2)}
+          <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} style={{ marginLeft: 4 }} />
+        </button>
+      );
+    }
     return (
       <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading}
-        title="Click to fetch oracle price">
+        title="Click to sign a tx & fetch oracle price">
         {pricesLoading ? <><RefreshCw size={12} className={styles.spin} /> Loading...</> : 'Loading...'}
       </button>
     );
@@ -177,7 +194,7 @@ export function TradeView() {
               <button
                 key={a}
                 className={asset === a ? styles.activeAsset : ''}
-                onClick={() => setAsset(a as Asset)}
+                onClick={() => handleAssetChange(a as Asset)}
               >
                 {a}
               </button>
@@ -198,12 +215,6 @@ export function TradeView() {
                     <span className={Number(oracleData.change_24h_bps) >= 0 ? styles.positive : styles.negative} style={{ fontSize: 12, marginLeft: 4 }}>
                       {Number(oracleData.change_24h_bps) >= 0 ? '+' : ''}{(Number(oracleData.change_24h_bps) / 100).toFixed(2)}%
                     </span>
-                  )}
-                  {account && oraclePrice > 0 && lastFetched !== null && pricesStale && (
-                    <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading}
-                      title={`Price data is stale (${fmtTimeAgo(lastFetched)}). Click to refresh.`}>
-                      <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} />
-                    </button>
                   )}
                 </span>
             </div>
