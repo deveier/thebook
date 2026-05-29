@@ -7,10 +7,11 @@ import { parseContractError } from '../lib/errors';
 import { useViewport } from '../hooks/useViewport';
 import { useTxStatus, TxStatusOverlay } from '../components/ui/TxStatus';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useMarketData } from '../providers/MarketDataProvider';
 
 export function PoolsView() {
   const { program, account, isReady } = useSails();
-  const [pools, setPools] = useState<Pool[]>([]);
+  const { pools, loading: marketLoading } = useMarketData();
   const [myLp, setMyLp] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newA, setNewA] = useState<Asset>('BTC');
@@ -26,32 +27,36 @@ export function PoolsView() {
   }, []);
 
   useEffect(() => {
-    if (!program || !isReady) return;
-    program.amm.listPools().call().then(r => { if (r && mountedRef.current) setPools(r as Pool[]); }).catch(console.error);
-  }, [program, isReady]);
-
-  useEffect(() => {
     if (!program || !account || !isReady) return;
-    Promise.all(pools.map(p =>
+    Promise.allSettled(pools.map(p =>
       program.amm.getLpPosition(p.id, account.decodedAddress).call()
         .then(pos => pos ? { ...pos, pool: p } as any : null)
-    )).then(results => { if (mountedRef.current) setMyLp(results.filter(Boolean)); });
+    )).then(results => {
+      if (mountedRef.current) {
+        setMyLp(results
+          .filter(r => r.status === 'fulfilled')
+          .map(r => (r as PromiseFulfilledResult<any>).value)
+          .filter(Boolean));
+      }
+    });
   }, [program, account, isReady, pools]);
 
   const handleCreatePool = async () => {
     if (!program || !account) return;
-    const ok = await executeTx(
+    if (newA === newB) {
+      error('Cannot create a pool with the same asset on both sides.');
+      return;
+    }
+    const err = await executeTx(
       () => program!.amm.createPool(newA, newB),
       account,
-      async () => {
+      () => {
         success('Pool created!');
         setShowCreate(false);
-        const r = await program!.amm.listPools().call();
-        if (r && mountedRef.current) setPools(r as Pool[]);
       }
     );
-    if (!ok) {
-      error(parseContractError(txState.errorMsg));
+    if (err) {
+      error(parseContractError(err));
     }
   };
 
@@ -72,11 +77,11 @@ export function PoolsView() {
         {showCreate && (
           <Card title="Create Pool">
             <div className={styles.createForm}>
-              <select value={newA} onChange={e => setNewA(e.target.value as Asset)}>
+              <select value={newA} onChange={e => setNewA(e.target.value as Asset)} aria-label="First asset">
                 {['BTC', 'ETH', 'VARA'].map(a => <option key={a}>{a}</option>)}
               </select>
               <span style={{ color: 'var(--text-secondary)' }}>/</span>
-              <select value={newB} onChange={e => setNewB(e.target.value as Asset)}>
+              <select value={newB} onChange={e => setNewB(e.target.value as Asset)} aria-label="Second asset">
                 {['BTC', 'ETH', 'VARA'].map(a => <option key={a}>{a}</option>)}
               </select>
               <button onClick={handleCreatePool} disabled={txState.visible && txState.stage !== 'failed' && txState.stage !== 'confirmed'}>
@@ -89,20 +94,19 @@ export function PoolsView() {
         <Card title="Available Pools">
           {pools.length === 0 && (
             <EmptyState
-              icon={null}
-              title="No Pools Yet"
-              description="Be the first to create a liquidity pool and earn fees from swaps."
-              action={account ? { label: '+ Create Pool', onClick: () => setShowCreate(true) } : undefined}
+              title={marketLoading ? 'Loading...' : 'No Pools Yet'}
+              description={marketLoading ? 'Fetching pool data...' : 'Be the first to create a liquidity pool.'}
+              action={account && !showCreate ? { label: '+ Create Pool', onClick: () => setShowCreate(true) } : undefined}
             />
           )}
           {!isMobile && pools.length > 0 && (
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Pool Pair</th>
-                  <th>Reserve A</th>
-                  <th>Reserve B</th>
-                  <th>Actions</th>
+                  <th scope="col">Pool Pair</th>
+                  <th scope="col">Reserve A</th>
+                  <th scope="col">Reserve B</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -141,7 +145,7 @@ export function PoolsView() {
             />
           )}
           {myLp.map((pos: any) => (
-            <div key={pos.pool_id.toString()} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
+            <div key={pos.pool_id.toString()} className={styles.lpRow}>
               <div style={{ fontWeight: 600 }}>Pool #{pos.pool_id.toString()}</div>
               <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>LP Amount: {formatAmount(pos.amount)}</div>
             </div>

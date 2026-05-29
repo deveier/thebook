@@ -1,13 +1,14 @@
 import { useAccount, useApi } from '@gear-js/react-hooks';
 import { web3Accounts, web3Enable } from '@polkadot/extension-dapp';
 import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
-import { Wallet, UserPlus, Menu } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Wallet, UserPlus, Menu, TrendingUp, TrendingDown } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import styles from './Header.module.css';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { useToast } from '../ui/Toast';
 import { useViewport } from '../../hooks/useViewport';
 import { AccountSelector } from '../ui/AccountSelector';
+import { useMarketData } from '../../providers/MarketDataProvider';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -19,17 +20,13 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { portfolio, join, loading } = usePortfolio();
   const { success, error } = useToast();
   const { isMobile } = useViewport();
-  const prevPortfolio = useRef(portfolio);
+  const { prices, lastFetched } = useMarketData();
   const [showAccountSelector, setShowAccountSelector] = useState(false);
+  const joinedRef = useRef(false);
 
-  useEffect(() => {
-    if (!prevPortfolio.current && portfolio) {
-      success('Joined the DEX successfully!');
-    }
-    prevPortfolio.current = portfolio;
-  }, [portfolio]);
+  const prevPortfolio = useRef(portfolio);
 
-  const handleConnect = async () => {
+  const handleConnect = useCallback(async () => {
     const exts = await web3Enable('thebookdex');
     if (exts.length === 0) {
       error('No wallet extension detected. Install Polkadot.js or SubWallet.');
@@ -50,9 +47,9 @@ export function Header({ onMenuClick }: HeaderProps) {
       return;
     }
     setShowAccountSelector(true);
-  };
+  }, [error, login]);
 
-  const handleAccountSelect = (acc: InjectedAccountWithMeta) => {
+  const handleAccountSelect = useCallback((acc: InjectedAccountWithMeta) => {
     web3Enable('thebookdex').then(exts => {
       login({
         ...acc,
@@ -61,11 +58,22 @@ export function Header({ onMenuClick }: HeaderProps) {
       });
     });
     setShowAccountSelector(false);
-  };
+  }, [login]);
+
+  const handleJoin = useCallback(async () => {
+    joinedRef.current = true;
+    await join();
+  }, [join]);
 
   const formatUsd = (val: bigint | number | string) => {
     return (Number(val) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 });
   };
+
+  const priceTicker = [
+    { asset: 'BTC', data: prices.BTC },
+    { asset: 'ETH', data: prices.ETH },
+    { asset: 'VARA', data: prices.VARA },
+  ];
 
   return (
     <>
@@ -78,14 +86,35 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div className={styles.logo}>
           <span className={styles.accent}>the</span>bookdex
         </div>
-        <div className={styles.actions}>
-          {!isMobile && (
-            <div className={styles.status}>
-              <div className={`${styles.dot} ${isApiReady ? styles.online : styles.offline}`} />
-              {isApiReady ? 'Vara Mainnet' : 'Connecting...'}
-            </div>
-          )}
 
+        {/* Public price ticker — always visible */}
+        {!isMobile && (
+          <div className={styles.ticker}>
+            {priceTicker.map(({ asset, data }) => (
+              <div key={asset} className={styles.tickerItem}>
+                <span className={styles.tickerAsset}>{asset}</span>
+                <span className={styles.tickerPrice}>
+                  {data?.price_usd_micro
+                    ? `$${(Number(data.price_usd_micro) / 1_000_000).toFixed(2)}`
+                    : '---'}
+                </span>
+                {data?.change_24h_bps !== undefined && (
+                  <span className={Number(data.change_24h_bps) >= 0 ? styles.tickerUp : styles.tickerDown}>
+                    {Number(data.change_24h_bps) >= 0
+                      ? <TrendingUp size={12} />
+                      : <TrendingDown size={12} />}
+                    {(Number(data.change_24h_bps) / 100).toFixed(2)}%
+                  </span>
+                )}
+              </div>
+            ))}
+            {!account && !lastFetched && (
+              <div className={styles.tickerHint}>Connect wallet for prices</div>
+            )}
+          </div>
+        )}
+
+        <div className={styles.actions}>
           {account && !isMobile && (
             <div className={styles.balanceInfo}>
               <span className={styles.balanceLabel}>Balance:</span>
@@ -98,7 +127,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           {account ? (
             <div className={styles.accountInfo}>
               {!portfolio && (
-                 <button onClick={join} className={styles.joinButton} disabled={loading}>
+                 <button onClick={handleJoin} className={styles.joinButton} disabled={loading}>
                   <UserPlus size={16} />
                   {loading ? 'Joining...' : isMobile ? 'Join' : 'Join DEX'}
                 </button>

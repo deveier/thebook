@@ -1,29 +1,26 @@
 import { Card } from '../components/ui/Card';
 import { ArrowDown } from 'lucide-react';
 import styles from './SwapView.module.css';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useSails } from '../hooks/useSails';
 import { useToast } from '../components/ui/Toast';
 import { parseContractError } from '../lib/errors';
 import { useTxStatus, TxStatusOverlay } from '../components/ui/TxStatus';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useMarketData } from '../providers/MarketDataProvider';
 
 export function SwapView() {
-  const { program, account, isReady } = useSails();
-  const [pools, setPools] = useState<Pool[]>([]);
+  const { program, account } = useSails();
+  const { pools, loading: marketLoading } = useMarketData();
   const [fromAsset, setFromAsset] = useState('VARA');
   const [toAsset, setToAsset] = useState('ETH');
   const [amountIn, setAmountIn] = useState('');
   const [amountOut, setAmountOut] = useState('');
+  const [slippage, setSlippage] = useState(0.5);
   const { success, error } = useToast();
   const { txState, executeTx, resetTx } = useTxStatus();
 
-  useEffect(() => {
-    if (!program || !isReady) return;
-    program.amm.listPools().call().then(result => {
-      if (result) setPools(result as Pool[]);
-    }).catch(console.error);
-  }, [program, isReady]);
+  const availAssets = [...new Set(pools.flatMap(p => [p.asset_a, p.asset_b]))];
 
   const activePool = pools.find(p =>
     (p.asset_a === fromAsset && p.asset_b === toAsset) ||
@@ -52,11 +49,12 @@ export function SwapView() {
     const parsedIn = parseFloat(amountIn);
     const parsedOut = parseFloat(amountOut);
     if (isNaN(parsedIn) || parsedIn <= 0) return;
-    const minOutValue = isNaN(parsedOut) || parsedOut <= 0 ? 0n : BigInt(Math.round(parsedOut * 10**8 * 0.995));
+    const slippageMultiplier = (100 - slippage) / 100;
+    const minOutValue = isNaN(parsedOut) || parsedOut <= 0 ? 0n : BigInt(Math.round(parsedOut * 10**8 * slippageMultiplier));
     const inAmount = BigInt(Math.round(parsedIn * 10**8));
     const minOut = minOutValue;
 
-    const ok = await executeTx(
+    const err = await executeTx(
       () => program!.amm.swap(activePool.id, fromAsset as Asset, inAmount, minOut),
       account,
       () => {
@@ -66,8 +64,8 @@ export function SwapView() {
       }
     );
 
-    if (!ok) {
-      error(parseContractError(txState.errorMsg));
+    if (err) {
+      error(parseContractError(err));
     }
   };
 
@@ -81,10 +79,11 @@ export function SwapView() {
             </div>
             <div className={styles.inputRow}>
               <input type="number" placeholder="0.00" className={styles.amountInput}
-                value={amountIn} onChange={e => { setAmountIn(e.target.value); calculateOut(e.target.value); }} />
+                value={amountIn} onChange={e => { setAmountIn(e.target.value); calculateOut(e.target.value); }}
+                aria-label="Amount to swap from" />
               <select value={fromAsset} onChange={e => { setFromAsset(e.target.value); setAmountOut(''); }}
-                className={styles.assetSelect}>
-                {['VARA', 'BTC', 'ETH'].map(a => <option key={a}>{a}</option>)}
+                className={styles.assetSelect} aria-label="From asset">
+                {availAssets.map(a => <option key={a}>{a}</option>)}
               </select>
             </div>
           </div>
@@ -98,11 +97,28 @@ export function SwapView() {
               <span>To (Estimated)</span>
             </div>
             <div className={styles.inputRow}>
-              <input type="number" placeholder="0.00" className={styles.amountInput} readOnly value={amountOut} />
+              <input type="number" placeholder="0.00" className={styles.amountInput} readOnly value={amountOut}
+                aria-label="Estimated amount to receive" />
               <select value={toAsset} onChange={e => setToAsset(e.target.value)}
-                className={styles.assetSelect}>
-                {['ETH', 'VARA', 'BTC'].map(a => <option key={a}>{a}</option>)}
+                className={styles.assetSelect} aria-label="To asset">
+                {availAssets.map(a => <option key={a}>{a}</option>)}
               </select>
+            </div>
+          </div>
+
+          <div className={styles.slippageRow}>
+            <span>Slippage Tolerance</span>
+            <div className={styles.slippageOptions}>
+              {[0.1, 0.5, 1.0].map(s => (
+                <button key={s}
+                  className={`${styles.slippageBtn} ${slippage === s ? styles.slippageActive : ''}`}
+                  onClick={() => setSlippage(s)}>
+                  {s}%
+                </button>
+              ))}
+              <input type="number" value={slippage} onChange={e => setSlippage(parseFloat(e.target.value) || 0.5)}
+                className={styles.slippageInput} min={0.01} max={50} step={0.1}
+                aria-label="Custom slippage percentage" />
             </div>
           </div>
 
@@ -111,10 +127,6 @@ export function SwapView() {
               <div className={styles.infoRow}>
                 <span>Pool Reserves</span>
                 <span>{activePool.asset_a}: {Number(activePool.reserve_a) / 10**8} / {activePool.asset_b}: {Number(activePool.reserve_b) / 10**8}</span>
-              </div>
-              <div className={styles.infoRow}>
-                <span>Slippage Tolerance</span>
-                <span>0.5%</span>
               </div>
             </div>
           )}
@@ -137,8 +149,8 @@ export function SwapView() {
           <Card title="Available Pools">
             {pools.length === 0 && (
               <EmptyState
-                title="No Pools Found"
-                description="Visit the Pools page to create the first liquidity pool."
+                title={marketLoading ? 'Loading...' : 'No Pools Found'}
+                description={marketLoading ? 'Fetching pool data...' : 'Visit the Pools page to create the first liquidity pool.'}
               />
             )}
             {pools.map(p => (

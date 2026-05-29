@@ -7,6 +7,8 @@ interface SkeletonProps {
   className?: string;
 }
 
+const SKELETON_WIDTHS = ['70%', '85%', '65%', '90%', '75%'];
+
 export function Skeleton({ width = '100%', height = 20, borderRadius = 4, className }: SkeletonProps) {
   return (
     <div
@@ -26,7 +28,7 @@ export function SkeletonCard({ lines = 3 }: { lines?: number }) {
     <div className={styles.card}>
       <Skeleton height={14} width="40%" borderRadius={4} />
       {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton key={i} height={12} width={`${60 + Math.random() * 30}%`} borderRadius={4} />
+        <Skeleton key={i} height={12} width={SKELETON_WIDTHS[i % SKELETON_WIDTHS.length]} borderRadius={4} />
       ))}
     </div>
   );

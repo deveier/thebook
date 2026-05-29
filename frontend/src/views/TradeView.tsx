@@ -1,16 +1,15 @@
 import { Card } from '../components/ui/Card';
 import styles from './TradeView.module.css';
-import { useState, useMemo } from 'react';
-import { useOrderbook } from '../hooks/useOrderbook';
+import { useState, useMemo, useCallback } from 'react';
 import { usePortfolio } from '../hooks/usePortfolio';
-import { useOracle } from '../hooks/useOracle';
 import { useSails } from '../hooks/useSails';
-import { TrendingUp, TrendingDown, BarChart3, BookOpen, ListOrdered, ShoppingCart, Wallet } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, BookOpen, ListOrdered, ShoppingCart } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 import { parseContractError } from '../lib/errors';
 import { useViewport } from '../hooks/useViewport';
 import { useTxStatus, TxStatusOverlay } from '../components/ui/TxStatus';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useMarketData } from '../providers/MarketDataProvider';
 
 type PanelId = 'chart' | 'orderbook' | 'trades' | 'entry';
 
@@ -30,56 +29,27 @@ export function TradeView() {
   const [mobilePanel, setMobilePanel] = useState<PanelId>('chart');
   const { isMobile } = useViewport();
 
-  const { orderbook, trades, refresh: refreshOb } = useOrderbook(asset);
+  const { prices, orderbooks, trades, loading: marketLoading } = useMarketData();
   const { portfolio, refresh: refreshPortfolio } = usePortfolio();
-  const { priceData: oracleData } = useOracle(asset);
   const { program, account } = useSails();
   const { success, error } = useToast();
   const { txState, executeTx, resetTx } = useTxStatus();
 
-  const handlePlaceOrder = async () => {
-    if (!program || !account || !qty) return;
-    const parsedQty = parseFloat(qty);
-    if (isNaN(parsedQty) || parsedQty <= 0) {
-      error('Invalid quantity');
-      return;
-    }
-    if (orderType === 'Limit') {
-      const parsedPrice = parseFloat(price);
-      if (isNaN(parsedPrice) || parsedPrice <= 0) {
-        error('Invalid price');
-        return;
-      }
-    }
-
-    const q = BigInt(Math.round(parsedQty * 10**8));
-
-    const ok = await executeTx(
-      () => {
-        if (orderType === 'Market') {
-          return program!.orderbook.marketSell(asset, q);
-        }
-        const p = BigInt(Math.round(parseFloat(price) * 100));
-        return program!.orderbook.placeLimit(side, asset, p, q);
-      },
-      account,
-      () => {
-        setPrice('');
-        setQty('');
-        refreshOb();
-        refreshPortfolio();
-        success('Order placed successfully!');
-      }
-    );
-
-    if (!ok) {
-      error(parseContractError(txState.errorMsg));
-    }
-  };
-
-  const lastPrice = trades.length > 0 ? trades[0].price : 0n;
+  const orderbook = orderbooks[asset] || { bids: [], asks: [] };
+  const tradesList = trades[asset] || [];
+  const oracleData = prices[asset];
   const oraclePriceMicro = oracleData ? BigInt(oracleData.price_usd_micro) : 0n;
-  const oraclePriceCents = oraclePriceMicro / 10000n;
+  const oraclePrice = oraclePriceMicro > 0n ? Number(oraclePriceMicro) / 1_000_000 : 0;
+
+  const lastPrice = tradesList.length > 0 ? tradesList[0].price : 0n;
+
+  const priceDiff = useMemo(() => {
+    const lp = Number(lastPrice) / 100;
+    if (!lp || !oraclePrice) return null;
+    const diff = (lp - oraclePrice) / oraclePrice * 100;
+    return diff;
+  }, [lastPrice, oraclePrice]);
+
   const maxQty = useMemo(() => {
     let m = 0n;
     for (const [, q] of [...orderbook.asks, ...orderbook.bids]) {
@@ -88,12 +58,6 @@ export function TradeView() {
     }
     return m;
   }, [orderbook]);
-  
-  const priceDiff = useMemo(() => {
-    if (!lastPrice || !oraclePriceCents) return null;
-    const diff = Number(lastPrice - oraclePriceCents) / Number(oraclePriceCents) * 100;
-    return diff;
-  }, [lastPrice, oraclePriceCents]);
 
   const availableBalance = useMemo(() => {
     if (!portfolio) return { value: 0n, label: '$0.00', decimals: 2 };
@@ -133,6 +97,63 @@ export function TradeView() {
     return 8;
   }
 
+  const handlePlaceOrder = async () => {
+    if (!program || !account || !qty) return;
+    const parsedQty = parseFloat(qty);
+    if (isNaN(parsedQty) || parsedQty <= 0) {
+      error('Invalid quantity');
+      return;
+    }
+    if (orderType === 'Limit') {
+      const parsedPrice = parseFloat(price);
+      if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        error('Invalid price');
+        return;
+      }
+    }
+
+    const q = BigInt(Math.round(parsedQty * 10**8));
+
+    const err = await executeTx(
+      () => {
+        if (orderType === 'Market') {
+          if (side === 'Buy') {
+            return program!.orderbook.marketBuy(asset, q);
+          }
+          return program!.orderbook.marketSell(asset, q);
+        }
+        const p = BigInt(Math.round(parseFloat(price) * 100));
+        return program!.orderbook.placeLimit(side, asset, p, q);
+      },
+      account,
+      () => {
+        setPrice('');
+        setQty('');
+        refreshPortfolio();
+        success('Order placed successfully!');
+      }
+    );
+
+    if (err) {
+      error(parseContractError(err));
+    }
+  };
+
+  const renderPrice = () => {
+    if (oraclePrice > 0) {
+      return <>${oraclePrice.toFixed(2)}</>;
+    }
+    if (!account) return 'Connect wallet';
+    return 'Loading...';
+  };
+
+  const handleObKeyDown = useCallback((e: React.KeyboardEvent, priceVal: string) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setPrice(priceVal);
+    }
+  }, []);
+
   const chartPanel = (
     <Card title={`${asset} / USD Chart`} className={styles.fullHeight}>
       <div className={styles.headerStats}>
@@ -150,22 +171,19 @@ export function TradeView() {
          <div className={styles.marketStats}>
             <div className={styles.statItem}>
                 <span className={styles.statLabel}>DEX Price</span>
-                <span className={styles.statValue}>${lastPrice ? (Number(lastPrice)/100).toFixed(2) : trades.length === 0 ? 'No trades yet' : '---'}</span>
+                <span className={styles.statValue}>
+                  ${lastPrice ? (Number(lastPrice)/100).toFixed(2) : '---'}
+                </span>
             </div>
             <div className={styles.statItem}>
                 <span className={styles.statLabel}>Oracle Price</span>
                 <span className={styles.statValue}>
-                  {account
-                    ? (oraclePriceMicro
-                      ? <>${(Number(oraclePriceMicro)/1_000_000).toFixed(2)}
-                          {oracleData?.change_24h_bps !== undefined && (
-                            <span className={Number(oracleData.change_24h_bps) >= 0 ? styles.positive : styles.negative} style={{ fontSize: 12, marginLeft: 4 }}>
-                              {Number(oracleData.change_24h_bps) >= 0 ? '+' : ''}{(Number(oracleData.change_24h_bps) / 100).toFixed(2)}%
-                            </span>
-                          )}
-                        </>
-                      : 'Loading...')
-                    : 'Connect wallet'}
+                  {renderPrice()}
+                  {oracleData?.change_24h_bps !== undefined && (
+                    <span className={Number(oracleData.change_24h_bps) >= 0 ? styles.positive : styles.negative} style={{ fontSize: 12, marginLeft: 4 }}>
+                      {Number(oracleData.change_24h_bps) >= 0 ? '+' : ''}{(Number(oracleData.change_24h_bps) / 100).toFixed(2)}%
+                    </span>
+                  )}
                 </span>
             </div>
             {priceDiff !== null && (
@@ -195,14 +213,17 @@ export function TradeView() {
       <div className={styles.obList}>
         {orderbook.asks.length === 0 && orderbook.bids.length === 0 && (
           <EmptyState
-            title="No Orders Yet"
-            description="Be the first to place an order! Click a price below to fill the order form."
+            title={marketLoading ? 'Loading...' : 'No Orders Yet'}
+            description={marketLoading ? 'Fetching orderbook data...' : 'Be the first to place an order! Click a price below to fill the order form.'}
           />
         )}
         {orderbook.asks.slice(0, 10).reverse().map(([p, q], i) => (
           <div key={i} className={`${styles.obRow} ${styles.ask}`}
             style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
-            onClick={() => setPrice((Number(p)/100).toString())}>
+            onClick={() => setPrice((Number(p)/100).toString())}
+            role="button" tabIndex={0}
+            onKeyDown={e => handleObKeyDown(e, (Number(p)/100).toString())}
+            aria-label={`Ask price ${(Number(p)/100).toFixed(2)}, quantity ${(Number(q)/10**8).toFixed(4)}`}>
             <span>{(Number(p)/100).toFixed(2)}</span>
             <span>{(Number(q)/10**8).toFixed(4)}</span>
             <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
@@ -215,7 +236,10 @@ export function TradeView() {
         {orderbook.bids.slice(0, 10).map(([p, q], i) => (
           <div key={i} className={`${styles.obRow} ${styles.bid}`}
             style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
-            onClick={() => setPrice((Number(p)/100).toString())}>
+            onClick={() => setPrice((Number(p)/100).toString())}
+            role="button" tabIndex={0}
+            onKeyDown={e => handleObKeyDown(e, (Number(p)/100).toString())}
+            aria-label={`Bid price ${(Number(p)/100).toFixed(2)}, quantity ${(Number(q)/10**8).toFixed(4)}`}>
             <span>{(Number(p)/100).toFixed(2)}</span>
             <span>{(Number(q)/10**8).toFixed(4)}</span>
             <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
@@ -231,12 +255,14 @@ export function TradeView() {
         <button
           className={orderType === 'Limit' ? styles.activeType : ''}
           onClick={() => setOrderType('Limit')}
+          aria-pressed={orderType === 'Limit'}
         >
           Limit
         </button>
         <button
           className={orderType === 'Market' ? styles.activeType : ''}
           onClick={() => setOrderType('Market')}
+          aria-pressed={orderType === 'Market'}
         >
           Market
         </button>
@@ -246,12 +272,14 @@ export function TradeView() {
           <button
             className={`${styles.buyBtn} ${side === 'Buy' ? '' : styles.inactive}`}
             onClick={() => setSide('Buy')}
+            aria-pressed={side === 'Buy'}
           >
             Buy
           </button>
           <button
             className={`${styles.sellBtn} ${side === 'Sell' ? '' : styles.inactive}`}
             onClick={() => setSide('Sell')}
+            aria-pressed={side === 'Sell'}
           >
             Sell
           </button>
@@ -261,9 +289,9 @@ export function TradeView() {
         <div className={styles.formGroup}>
           <label>Price (USD)</label>
           <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" />
-          {oraclePriceMicro > 0n && (
-              <div className={styles.inputHint} onClick={() => setPrice((Number(oraclePriceMicro)/1_000_000).toString())}>
-                  Oracle: ${(Number(oraclePriceMicro)/1_000_000).toFixed(2)}
+          {oraclePrice > 0 && (
+              <div className={styles.inputHint} onClick={() => setPrice(oraclePrice.toFixed(2))}>
+                  Oracle: ${oraclePrice.toFixed(2)}
               </div>
           )}
         </div>
@@ -274,8 +302,7 @@ export function TradeView() {
           <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="0.00" />
           {account && portfolio && (
             <div className={styles.balanceTag} onClick={() => applyPreset(100)}>
-              <Wallet size={12} />
-              <span className={styles.balanceTagLabel}>Balance: {availableBalance.label}</span>
+              Balance: {availableBalance.label}
             </div>
           )}
         </div>
@@ -296,11 +323,11 @@ export function TradeView() {
         </div>
       )}
       <button
-        className={orderType === 'Market' ? styles.submitSell : (side === 'Buy' ? styles.submitBuy : styles.submitSell)}
+        className={side === 'Buy' ? styles.submitBuy : styles.submitSell}
         onClick={handlePlaceOrder}
         disabled={txState.visible && txState.stage !== 'failed' && txState.stage !== 'confirmed'}
       >
-        {txState.stage === 'broadcasting' || txState.stage === 'confirming' ? 'Processing...' : orderType === 'Market' ? `Market Sell ${asset}` : `${side} ${asset}`}
+        {txState.stage === 'broadcasting' || txState.stage === 'confirming' ? 'Processing...' : orderType === 'Market' ? `Market ${side} ${asset}` : `${side} ${asset}`}
       </button>
       {!account && <div className={styles.connectWarn}>Connect wallet to trade</div>}
     </Card>
@@ -314,13 +341,13 @@ export function TradeView() {
         <span>Time</span>
       </div>
       <div className={styles.obList}>
-        {trades.length === 0 && (
+        {tradesList.length === 0 && (
           <EmptyState
-            title="No Trades Yet"
-            description="Trades will appear here once orders are matched."
+            title={marketLoading ? 'Loading...' : 'No Trades Yet'}
+            description={marketLoading ? 'Fetching trade history...' : 'Trades will appear here once orders are matched.'}
           />
         )}
-        {trades.map((t, i) => (
+        {tradesList.map((t, i) => (
           <div key={i} className={styles.obRow}>
             <span className={styles.buyText}>{(Number(t.price)/100).toFixed(2)}</span>
             <span>{(Number(t.qty)/10**8).toFixed(4)}</span>

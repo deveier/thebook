@@ -1,23 +1,12 @@
-import { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
-import { useSails } from '../hooks/useSails';
 import { useViewport } from '../hooks/useViewport';
-import { useAccount } from '@gear-js/react-hooks';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useMarketData } from '../providers/MarketDataProvider';
 import { Trophy, Medal, Award } from 'lucide-react';
 
 export function LeaderboardView() {
-  const { program, isReady } = useSails();
-  const [leaders, setLeaders] = useState<LeaderEntry[]>([]);
-  const { account } = useAccount();
+  const { leaders, loading: marketLoading } = useMarketData();
   const { isMobile } = useViewport();
-
-  useEffect(() => {
-    if (!program || !isReady) return;
-    program.orderbook.getLeaderboard(10).call().then(result => {
-      if (result && Array.isArray(result)) setLeaders(result);
-    }).catch(console.error);
-  }, [program, isReady]);
 
   const rankIcon = (i: number) => {
     if (i === 0) return <Trophy size={18} color="var(--primary)" />;
@@ -32,9 +21,8 @@ export function LeaderboardView() {
         <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: 16 }}>Leaderboard</h1>
         <Card title="Top Traders">
           <EmptyState
-            title="No Traders Yet"
-            description="Start trading to top the leaderboard! The top 10 traders by PnL are ranked here."
-            action={account ? { label: 'Start Trading', onClick: () => {} } : undefined}
+            title={marketLoading ? 'Loading...' : 'No Traders Yet'}
+            description={marketLoading ? 'Fetching leaderboard...' : 'Start trading to top the leaderboard!'}
           />
         </Card>
       </div>

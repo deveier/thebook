@@ -56,7 +56,7 @@ export function OnboardingWizard({ onComplete, onDismiss, onNavigateToTab }: Onb
           <X size={20} />
         </button>
 
-        <div className={styles.stepsBar}>
+        <div className={styles.stepsBar} role="progressbar" aria-valuenow={steps.filter(s => s.done).length} aria-valuemin={0} aria-valuemax={steps.length} aria-label="Onboarding progress">
           {steps.map((s, i) => (
             <div key={s.key} className={`${styles.stepDot} ${s.done ? styles.done : ''} ${s.key === effectiveStep ? styles.current : ''}`}>
               <div className={styles.dot}>{s.done ? <Check size={12} /> : i + 1}</div>

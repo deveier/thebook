@@ -11,11 +11,11 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export function PortfolioView() {
-  const { portfolio, loading, refresh: refreshPortfolio } = usePortfolio();
+  const { portfolio, loading, join, refresh: refreshPortfolio } = usePortfolio();
   const { program, account, isReady } = useSails();
   const [orders, setOrders] = useState<any[]>([]);
   const [cancelling, setCancelling] = useState<number | null>(null);
-  const { success, error } = useToast();
+  const { success, error, info } = useToast();
   const { txState, resetTx } = useTxStatus();
 
   useEffect(() => {
@@ -37,13 +37,21 @@ export function PortfolioView() {
       success('Order cancelled');
       setOrders(prev => prev.filter((o: any) => Number(o[0]) !== Number(oid)));
       refreshPortfolio();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Cancel failed:', e);
-      error(parseContractError(e));
+      error(parseContractError(e?.message || String(e)));
     } finally {
       setCancelling(null);
     }
   }, [program, account, success, error, refreshPortfolio]);
+
+  const handleDeposit = useCallback(() => {
+    info('Deposit functionality coming soon. Use Vara Network wallet transfer to deposit funds.');
+  }, [info]);
+
+  const handleWithdraw = useCallback(() => {
+    info('Withdraw functionality coming soon.');
+  }, [info]);
 
   const formatAmount = (val: bigint | number | string, decimals: number = 2) => {
      const n = Number(val);
@@ -61,7 +69,7 @@ export function PortfolioView() {
             description={loading ? 'Loading portfolio...' : 'Join the DEX to start trading and tracking your balances.'}
             action={!loading && account ? {
               label: 'Join DEX',
-              onClick: () => {},
+              onClick: join,
             } : undefined}
           />
         </Card>
@@ -87,15 +95,15 @@ export function PortfolioView() {
               <EmptyState
                 title="Empty Portfolio"
                 description="Deposit funds to start trading."
-                action={{ label: 'Deposit', onClick: () => {} }}
+                action={{ label: 'Deposit', onClick: handleDeposit }}
               />
             ) : (
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>Asset</th>
-                    <th>Balance</th>
-                    <th>Action</th>
+                    <th scope="col">Asset</th>
+                    <th scope="col">Balance</th>
+                    <th scope="col">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -105,10 +113,12 @@ export function PortfolioView() {
                       <td>{formatAmount(asset.amount, asset.decimals)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <button className={styles.actionBtn} title="Deposit">
+                          <button className={styles.actionBtn} title={`Deposit ${asset.name}`}
+                            onClick={handleDeposit} aria-label={`Deposit ${asset.name}`}>
                             <ArrowDownRight size={14} />
                           </button>
-                          <button className={styles.actionBtn} title="Withdraw">
+                          <button className={styles.actionBtn} title={`Withdraw ${asset.name}`}
+                            onClick={handleWithdraw} aria-label={`Withdraw ${asset.name}`}>
                             <ArrowUpRight size={14} />
                           </button>
                         </div>

@@ -130,14 +130,7 @@
   }
 }
 
-.stats {
-  display: flex;
-  flex-direction: column;
-}
-
-.placeholder {
-  padding: var(--space-2xl);
-  text-align: center;
-  color: var(--text-secondary);
-  font-style: italic;
+.lpRow {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
 }

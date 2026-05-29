@@ -76,6 +76,48 @@
   color: var(--primary);
 }
 
+.slippageRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin: var(--space-md) 0;
+  gap: var(--space-sm);
+}
+
+.slippageOptions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.slippageBtn {
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg-hover);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  min-height: 28px;
+  color: var(--text-secondary);
+}
+
+.slippageActive {
+  background: var(--primary);
+  color: #000;
+}
+
+.slippageInput {
+  width: 60px;
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg-hover);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  min-height: 28px;
+  text-align: center;
+}
+
 .priceInfo {
   margin: var(--space-lg) 0;
   display: flex;

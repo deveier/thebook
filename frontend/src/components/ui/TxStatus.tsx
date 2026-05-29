@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { TransactionBuilder } from 'sails-js';
 import { web3FromSource } from '@polkadot/extension-dapp';
@@ -33,7 +33,7 @@ interface UseTxStatusReturn {
     buildTx: () => TransactionBuilder<unknown>,
     account: { address: string; meta: { source: string } },
     onSuccess?: () => void,
-  ) => Promise<boolean>;
+  ) => Promise<string | null>;
   resetTx: () => void;
 }
 
@@ -45,9 +45,13 @@ export function useTxStatus(): UseTxStatusReturn {
     errorMsg: '',
   });
   const stageRef = useRef<TxStage>('idle');
+  const errorRef = useRef<string>('');
 
   const updateStage = useCallback((stage: TxStage, message?: string) => {
     stageRef.current = stage;
+    if (stage === 'failed') {
+      errorRef.current = message || '';
+    }
     setTxState(prev => ({
       ...prev,
       visible: true,
@@ -61,7 +65,7 @@ export function useTxStatus(): UseTxStatusReturn {
     buildTx: () => TransactionBuilder<unknown>,
     account: { address: string; meta: { source: string } },
     onSuccess?: () => void,
-  ): Promise<boolean> => {
+  ): Promise<string | null> => {
     try {
       updateStage('signing');
       const { signer } = await web3FromSource(account.meta.source);
@@ -76,16 +80,17 @@ export function useTxStatus(): UseTxStatusReturn {
 
       updateStage('confirmed', 'Transaction confirmed successfully');
       onSuccess?.();
-      return true;
+      return null;
     } catch (e: any) {
       const msg = e?.message || String(e);
       updateStage('failed', msg.length > 100 ? 'Transaction failed' : msg);
-      return false;
+      return errorRef.current || msg;
     }
   }, [updateStage]);
 
   const resetTx = useCallback(() => {
     stageRef.current = 'idle';
+    errorRef.current = '';
     setTxState({ visible: false, stage: 'idle', message: '', errorMsg: '' });
   }, []);
 
@@ -99,9 +104,18 @@ export function TxStatusOverlay({ state, onClose }: { state: TxState; onClose: (
   const failed = state.stage === 'failed';
   const activeStepIndex = STEPS.findIndex(s => s.stage === state.stage);
 
+  useEffect(() => {
+    if (confirmed || failed) {
+      const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+      window.addEventListener('keydown', handler);
+      return () => window.removeEventListener('keydown', handler);
+    }
+  }, [confirmed, failed, onClose]);
+
   return (
-    <div className={styles.overlay} onClick={failed || confirmed ? onClose : undefined}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+    <div className={styles.overlay} onClick={failed || confirmed ? onClose : undefined}
+      role="dialog" aria-modal="true" aria-label="Transaction status">
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
         {confirmed && <div className={styles.successIcon}><CheckCircle2 size={48} /></div>}
         {failed && <div className={styles.failIcon}><XCircle size={48} /></div>}
         {!confirmed && !failed && (

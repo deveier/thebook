@@ -115,13 +115,6 @@
   }
 }
 
-.placeholder {
-  padding: var(--space-2xl);
-  text-align: center;
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
 .emptyState {
   max-width: 600px;
   margin: 100px auto;
