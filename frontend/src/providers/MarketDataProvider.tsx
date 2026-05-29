@@ -34,30 +34,31 @@ interface MarketContextValue {
 
 /* ── Helpers ── */
 
-const STORAGE_PRICES_KEY = 'thebookdex_prices';
-const STORAGE_TS_KEY = 'thebookdex_prices_ts';
+const API_URL = '/api/prices';
 const ASSETS: Asset[] = ['BTC', 'ETH', 'VARA'];
 
-function loadCachedPrices(): MarketPrices {
-  try {
-    const raw = localStorage.getItem(STORAGE_PRICES_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
+function defaultPrices(): MarketPrices {
   return { BTC: null, ETH: null, VARA: null };
 }
 
-function loadCachedTimestamp(): number | null {
+async function loadSharedPrices(): Promise<{ prices: MarketPrices; timestamp: number | null }> {
   try {
-    const raw = localStorage.getItem(STORAGE_TS_KEY);
-    if (raw) return Number(raw);
+    const res = await fetch(API_URL);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.prices) return { prices: data.prices, timestamp: data.timestamp ?? null };
+    }
   } catch {}
-  return null;
+  return { prices: defaultPrices(), timestamp: null };
 }
 
-function saveCachedPrices(prices: MarketPrices, ts: number) {
+async function saveSharedPrices(prices: MarketPrices, ts: number) {
   try {
-    localStorage.setItem(STORAGE_PRICES_KEY, JSON.stringify(prices));
-    localStorage.setItem(STORAGE_TS_KEY, String(ts));
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prices, timestamp: ts }),
+    });
   } catch {}
 }
 
@@ -85,17 +86,30 @@ export function useMarketData() {
 export function MarketDataProvider({ children }: { children: ReactNode }) {
   const { account } = useAccount();
   const { program } = useSails();
-  const [prices, setPrices] = useState<MarketPrices>(loadCachedPrices);
+  const [prices, setPrices] = useState<MarketPrices>(defaultPrices);
   const [orderbooks, setOrderbooks] = useState<Record<string, OrderbookData>>({});
   const [trades, setTrades] = useState<Record<string, any[]>>({});
   const [pools, setPools] = useState<Pool[]>([]);
   const [leaders, setLeaders] = useState<LeaderEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastFetched, setLastFetched] = useState<number | null>(loadCachedTimestamp);
+  const [lastFetched, setLastFetched] = useState<number | null>(null);
   const [pricesLoading, setPricesLoading] = useState(false);
   const fetchingRef = useRef(false);
+  const initLoadedRef = useRef(false);
 
   const pricesStale = lastFetched !== null && Date.now() - lastFetched > STALE_MS;
+
+  /* Load shared prices from the server on mount */
+  useEffect(() => {
+    if (initLoadedRef.current) return;
+    initLoadedRef.current = true;
+    loadSharedPrices().then(({ prices: sp, timestamp }) => {
+      if (sp.BTC || sp.ETH || sp.VARA) {
+        setPrices(sp);
+        if (timestamp) setLastFetched(timestamp);
+      }
+    });
+  }, []);
 
   /* Fetch public data: orderbook + trades + pools + leaderboard */
   useEffect(() => {
@@ -172,7 +186,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     setPricesLoading(true);
     try {
       const { signer } = await web3FromSource(account.meta.source);
-      const newPrices: MarketPrices = { ...loadCachedPrices() };
+      const newPrices: MarketPrices = { BTC: null, ETH: null, VARA: null };
       let changed = false;
 
       for (const asset of ASSETS) {
@@ -194,7 +208,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         const ts = Date.now();
         setPrices(newPrices);
         setLastFetched(ts);
-        saveCachedPrices(newPrices, ts);
+        saveSharedPrices(newPrices, ts);
       }
     } finally {
       fetchingRef.current = false;

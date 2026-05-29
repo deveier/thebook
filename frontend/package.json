@@ -17,6 +17,8 @@
     "@polkadot/types": "12.4.2",
     "@polkadot/util": "^12.6.2",
     "@tanstack/react-query": "^5.62.7",
+    "@upstash/redis": "^1.38.0",
+    "@vercel/kv": "^3.0.0",
     "lucide-react": "^0.468.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
