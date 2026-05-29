@@ -165,54 +165,42 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [program]);
 
-  /* Fetch oracle prices (needs wallet) */
+  /* Fetch oracle prices (needs wallet — only call from user gesture, not from effects/interval) */
   const fetchPrices = useCallback(async () => {
     if (!program || !account || fetchingRef.current) return;
     fetchingRef.current = true;
     setPricesLoading(true);
+    try {
+      const { signer } = await web3FromSource(account.meta.source);
+      const newPrices: MarketPrices = { ...loadCachedPrices() };
+      let changed = false;
 
-    const { signer } = await web3FromSource(account.meta.source);
-    const newPrices: MarketPrices = { ...loadCachedPrices() };
-    let changed = false;
-
-    for (const asset of ASSETS) {
-      try {
-        const transaction = program.orderbook.getLivePrice(asset);
-        await transaction.withAccount(account.address, { signer }).withValue(0n).calculateGas();
-        const { response } = await Promise.race([
-          transaction.signAndSend(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timed out waiting for wallet signature')), 90_000)),
-        ]);
-        const result = await Promise.race([
-          response(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timed out waiting for chain confirmation')), 90_000)),
-        ]);
-        if (result && typeof result === 'object' && 'ok' in result) {
-          newPrices[asset] = result.ok as PriceFeed;
-          changed = true;
+      for (const asset of ASSETS) {
+        try {
+          const transaction = program.orderbook.getLivePrice(asset);
+          await transaction.withAccount(account.address, { signer }).withValue(0n).calculateGas();
+          const { response } = await transaction.signAndSend();
+          const result = await response();
+          if (result && typeof result === 'object' && 'ok' in result) {
+            newPrices[asset] = result.ok as PriceFeed;
+            changed = true;
+          }
+        } catch (e) {
+          console.error(`MarketDataProvider: Failed to fetch ${asset} price:`, e);
         }
-      } catch (e) {
-        console.error(`MarketDataProvider: Failed to fetch ${asset} price:`, e);
       }
-    }
 
-    if (changed) {
-      const ts = Date.now();
-      setPrices(newPrices);
-      setLastFetched(ts);
-      saveCachedPrices(newPrices, ts);
+      if (changed) {
+        const ts = Date.now();
+        setPrices(newPrices);
+        setLastFetched(ts);
+        saveCachedPrices(newPrices, ts);
+      }
+    } finally {
+      fetchingRef.current = false;
+      setPricesLoading(false);
     }
-
-    fetchingRef.current = false;
-    setPricesLoading(false);
   }, [program, account]);
-
-  /* Auto-fetch prices once when wallet first connects (account changes) */
-  useEffect(() => {
-    if (program && account && lastFetched === null) {
-      fetchPrices();
-    }
-  }, [account, program]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <MarketContext.Provider value={{
