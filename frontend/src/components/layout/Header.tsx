@@ -1,4 +1,4 @@
-import { useAccount, useApi } from '@gear-js/react-hooks';
+import { useAccount } from '@gear-js/react-hooks';
 import { web3Accounts, web3Enable } from '@polkadot/extension-dapp';
 import { decodeAddress } from '@polkadot/util-crypto';
 import { u8aToHex } from '@polkadot/util';
@@ -16,8 +16,6 @@ interface HeaderProps {
   onMenuClick: () => void;
 }
 
-const STALE_MS = 5 * 60 * 1000;
-
 function fmtTimeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const m = Math.floor(diff / 60000);
@@ -28,9 +26,8 @@ function fmtTimeAgo(ts: number): string {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { account, login, logout } = useAccount();
-  const { isApiReady } = useApi();
   const { portfolio, join, loading } = usePortfolio();
-  const { success, error } = useToast();
+  const { error } = useToast();
   const { isMobile } = useViewport();
   const { prices, lastFetched, pricesStale, pricesLoading, fetchPrices } = useMarketData();
   const [showAccountSelector, setShowAccountSelector] = useState(false);

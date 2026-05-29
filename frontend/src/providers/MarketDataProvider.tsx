@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, ty
 import { useAccount } from '@gear-js/react-hooks';
 import { web3FromSource } from '@polkadot/extension-dapp';
 import { useSails } from '../hooks/useSails';
-import { toBigInt, toPair, toTradesArray } from '../lib/helpers';
+import { toPair, toTradesArray } from '../lib/helpers';
 
 /* ── Types ── */
 
@@ -97,16 +97,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
 
   const pricesStale = lastFetched !== null && Date.now() - lastFetched > STALE_MS;
 
-  /* Periodic staleness check — every 30s, re-fetch if stale */
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (lastFetched !== null && Date.now() - lastFetched > STALE_MS && account && !fetchingRef.current) {
-        fetchPrices();
-      }
-    }, 30_000);
-    return () => clearInterval(interval);
-  }, [lastFetched, account, fetchPrices]);
-
   /* Fetch public data: orderbook + trades + pools + leaderboard */
   useEffect(() => {
     if (!program) return;
@@ -136,7 +126,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       for (let i = 0; i < ASSETS.length; i++) {
         const r = results[i];
         if (r.status === 'fulfilled') {
-          const { asset, obResult, tradesResult } = r.value;
+          const { asset, obResult, tradesResult } = r.value as { asset: Asset; obResult: any; tradesResult: any };
           if (obResult && Array.isArray(obResult)) {
             const bidsRaw: any[] = obResult[0] as any;
             const asksRaw: any[] = obResult[1] as any;
@@ -217,6 +207,16 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       fetchPrices();
     }
   }, [program, account, fetchPrices, lastFetched, pricesStale]);
+
+  /* Periodic staleness check — every 30s, re-fetch if stale */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (lastFetched !== null && Date.now() - lastFetched > STALE_MS && account && !fetchingRef.current) {
+        fetchPrices();
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [lastFetched, account, fetchPrices]);
 
   return (
     <MarketContext.Provider value={{

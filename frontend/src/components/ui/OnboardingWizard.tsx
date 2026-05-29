@@ -3,7 +3,6 @@ import { useAccount } from '@gear-js/react-hooks';
 import { web3Enable, web3Accounts } from '@polkadot/extension-dapp';
 import { decodeAddress } from '@polkadot/util-crypto';
 import { u8aToHex } from '@polkadot/util';
-import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { useToast } from './Toast';
 import { Wallet, UserPlus, Rocket, ArrowRight, Check, X, Loader2 } from 'lucide-react';

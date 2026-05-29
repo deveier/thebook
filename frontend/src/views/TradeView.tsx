@@ -20,8 +20,6 @@ const mobilePanels: { id: PanelId; label: string; icon: React.ElementType }[] = 
   { id: 'entry', label: 'Entry', icon: ShoppingCart },
 ];
 
-const STALE_MS = 5 * 60 * 1000;
-
 function fmtTimeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const m = Math.floor(diff / 60000);

@@ -11,7 +11,7 @@ import { useMarketData } from '../providers/MarketDataProvider';
 
 export function SwapView() {
   const { program, account } = useSails();
-  const { pools, loading: marketLoading, pricesStale, pricesLoading, fetchPrices } = useMarketData();
+  const { pools, loading: marketLoading, pricesStale } = useMarketData();
   const [fromAsset, setFromAsset] = useState('VARA');
   const [toAsset, setToAsset] = useState('ETH');
   const [amountIn, setAmountIn] = useState('');
