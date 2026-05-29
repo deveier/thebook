@@ -190,6 +190,15 @@
   opacity: 0.6;
 }
 
+@keyframes spin360 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin360 1s linear infinite;
+}
+
 @media (max-width: 767px) {
   .modal {
     max-width: 100%;

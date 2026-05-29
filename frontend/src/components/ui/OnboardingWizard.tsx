@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAccount } from '@gear-js/react-hooks';
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp';
+import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { useToast } from './Toast';
-import { Wallet, UserPlus, Rocket, ArrowRight, Check, X } from 'lucide-react';
+import { Wallet, UserPlus, Rocket, ArrowRight, Check, X, Loader2 } from 'lucide-react';
 import styles from './OnboardingWizard.module.css';
 
 interface OnboardingWizardProps {
@@ -14,11 +16,12 @@ interface OnboardingWizardProps {
 type Step = 'welcome' | 'connect' | 'join' | 'done';
 
 export function OnboardingWizard({ onComplete, onDismiss, onNavigateToTab }: OnboardingWizardProps) {
-  const { account } = useAccount();
+  const { account, login } = useAccount();
   const { portfolio, join, loading } = usePortfolio();
-  const { success } = useToast();
+  const { success, error } = useToast();
   const [step, setStep] = useState<Step>('welcome');
   const [joining, setJoining] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
   const currentStep = (): Step => {
     if (!account) return step === 'welcome' ? 'welcome' : 'connect';
@@ -27,6 +30,33 @@ export function OnboardingWizard({ onComplete, onDismiss, onNavigateToTab }: Onb
   };
 
   const effectiveStep = currentStep();
+
+  const handleConnectWallet = useCallback(async () => {
+    setConnecting(true);
+    try {
+      const exts = await web3Enable('thebookdex');
+      if (exts.length === 0) {
+        error('No wallet extension detected. Install Polkadot.js or SubWallet.');
+        setConnecting(false);
+        return;
+      }
+      const allAccounts = await web3Accounts();
+      if (allAccounts.length === 0) {
+        error('No accounts found in your wallet extension.');
+        setConnecting(false);
+        return;
+      }
+      const acc = allAccounts[0];
+      login({
+        ...acc,
+        decodedAddress: acc.address as `0x${string}`,
+        signer: exts[0].signer,
+      });
+    } catch (e: any) {
+      error(e?.message || 'Failed to connect wallet.');
+    }
+    setConnecting(false);
+  }, [login, error]);
 
   const handleJoin = async () => {
     setJoining(true);
@@ -91,12 +121,14 @@ export function OnboardingWizard({ onComplete, onDismiss, onNavigateToTab }: Onb
               <h2 className={styles.title}>Connect Your Wallet</h2>
               <p className={styles.desc}>
                 You'll need a Polkadot.js or SubWallet browser extension to interact
-                with the Vara Network. Click the "Connect Wallet" button in the header
-                to get started.
+                with the Vara Network. Click the button below to connect.
               </p>
-              <button className={styles.primaryBtn} onClick={() => setStep('join')}>
-                I've Connected
-                <ArrowRight size={18} />
+              <button className={styles.primaryBtn} onClick={handleConnectWallet} disabled={connecting}>
+                {connecting ? (
+                  <><Loader2 size={18} className={styles.spin} /> Connecting...</>
+                ) : (
+                  <><Wallet size={18} /> Connect Wallet</>
+                )}
               </button>
               <button className={styles.skipBtn} onClick={onDismiss}>
                 Skip for now
