@@ -178,7 +178,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     for (const asset of ASSETS) {
       try {
         const transaction = program.orderbook.getLivePrice(asset);
-        await transaction.withAccount(account.address, { signer }).withValue(0n).calculateGas();
+        await transaction.withAccount(account.address, { signer }).withValue(0n).withGas('max');
         const { response } = await transaction.signAndSend();
         const result = await response();
         if (result && typeof result === 'object' && 'ok' in result) {
