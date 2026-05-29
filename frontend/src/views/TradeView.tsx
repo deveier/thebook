@@ -114,9 +114,9 @@ export function TradeView() {
 
   const handlePlaceOrder = async () => {
     if (!program || !account || !qty) return;
-    if (pricesStale) {
-      error('Oracle price is stale. Click the oracle price icon to sign a refresh tx first.');
-      return;
+    if (pricesStale && !pricesLoading) {
+      success('Price is stale — signing a refresh tx now. Please approve in your wallet.');
+      await fetchPrices();
     }
     const parsedQty = parseFloat(qty);
     if (isNaN(parsedQty) || parsedQty <= 0) {
