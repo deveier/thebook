@@ -178,9 +178,15 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     for (const asset of ASSETS) {
       try {
         const transaction = program.orderbook.getLivePrice(asset);
-        await transaction.withAccount(account.address, { signer }).withValue(0n).withGas('max');
-        const { response } = await transaction.signAndSend();
-        const result = await response();
+        await transaction.withAccount(account.address, { signer }).withValue(0n).calculateGas();
+        const { response } = await Promise.race([
+          transaction.signAndSend(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timed out waiting for wallet signature')), 90_000)),
+        ]);
+        const result = await Promise.race([
+          response(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timed out waiting for chain confirmation')), 90_000)),
+        ]);
         if (result && typeof result === 'object' && 'ok' in result) {
           newPrices[asset] = result.ok as PriceFeed;
           changed = true;
@@ -201,22 +207,12 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     setPricesLoading(false);
   }, [program, account]);
 
-  /* Auto-fetch prices when wallet connects and prices are stale */
+  /* Auto-fetch prices once when wallet first connects (account changes) */
   useEffect(() => {
-    if (program && account && (lastFetched === null || pricesStale)) {
+    if (program && account && lastFetched === null) {
       fetchPrices();
     }
-  }, [program, account, fetchPrices, lastFetched, pricesStale]);
-
-  /* Periodic staleness check — every 30s, re-fetch if stale */
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (lastFetched !== null && Date.now() - lastFetched > STALE_MS && account && !fetchingRef.current) {
-        fetchPrices();
-      }
-    }, 30_000);
-    return () => clearInterval(interval);
-  }, [lastFetched, account, fetchPrices]);
+  }, [account, program]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <MarketContext.Provider value={{
