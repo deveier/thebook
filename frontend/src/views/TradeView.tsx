@@ -154,7 +154,12 @@ export function TradeView() {
       return <>${oraclePrice.toFixed(2)}</>;
     }
     if (!account) return 'Connect wallet';
-    return 'Loading...';
+    return (
+      <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading}
+        title="Click to fetch oracle price">
+        {pricesLoading ? <><RefreshCw size={12} className={styles.spin} /> Loading...</> : 'Loading...'}
+      </button>
+    );
   };
 
   const handleObKeyDown = useCallback((e: React.KeyboardEvent, priceVal: string) => {
@@ -194,7 +199,7 @@ export function TradeView() {
                       {Number(oracleData.change_24h_bps) >= 0 ? '+' : ''}{(Number(oracleData.change_24h_bps) / 100).toFixed(2)}%
                     </span>
                   )}
-                  {lastFetched !== null && pricesStale && (
+                  {account && oraclePrice > 0 && lastFetched !== null && pricesStale && (
                     <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading}
                       title={`Price data is stale (${fmtTimeAgo(lastFetched)}). Click to refresh.`}>
                       <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} />
