@@ -159,8 +159,10 @@ export function TradeView() {
   };
 
   const renderPrice = () => {
-    if (!account) return 'Connect wallet';
     if (oraclePrice > 0) {
+      if (!account) {
+        return <>${oraclePrice.toFixed(2)}</>;
+      }
       const staleTitle = lastFetched ? `Price is stale (${fmtTimeAgo(lastFetched)}). Click to sign a tx & refresh.` : 'Click to refresh price';
       return (
         <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading} title={staleTitle}>
@@ -169,6 +171,7 @@ export function TradeView() {
         </button>
       );
     }
+    if (!account) return 'Connect wallet';
     return (
       <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading}
         title="Click to sign a tx & fetch oracle price">
