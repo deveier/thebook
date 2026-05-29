@@ -3,7 +3,7 @@ import styles from './TradeView.module.css';
 import { useState, useMemo, useCallback } from 'react';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { useSails } from '../hooks/useSails';
-import { TrendingUp, TrendingDown, BarChart3, BookOpen, ListOrdered, ShoppingCart } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, BookOpen, ListOrdered, ShoppingCart, RefreshCw } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 import { parseContractError } from '../lib/errors';
 import { useViewport } from '../hooks/useViewport';
@@ -20,6 +20,16 @@ const mobilePanels: { id: PanelId; label: string; icon: React.ElementType }[] = 
   { id: 'entry', label: 'Entry', icon: ShoppingCart },
 ];
 
+const STALE_MS = 5 * 60 * 1000;
+
+function fmtTimeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  if (m >= 1) return `${m}m ${s}s ago`;
+  return `${s}s ago`;
+}
+
 export function TradeView() {
   const [asset, setAsset] = useState<Asset>('BTC');
   const [orderType, setOrderType] = useState<'Limit' | 'Market'>('Limit');
@@ -29,7 +39,7 @@ export function TradeView() {
   const [mobilePanel, setMobilePanel] = useState<PanelId>('chart');
   const { isMobile } = useViewport();
 
-  const { prices, orderbooks, trades, loading: marketLoading } = useMarketData();
+  const { prices, orderbooks, trades, loading: marketLoading, lastFetched, pricesStale, pricesLoading, fetchPrices } = useMarketData();
   const { portfolio, refresh: refreshPortfolio } = usePortfolio();
   const { program, account } = useSails();
   const { success, error } = useToast();
@@ -183,6 +193,12 @@ export function TradeView() {
                     <span className={Number(oracleData.change_24h_bps) >= 0 ? styles.positive : styles.negative} style={{ fontSize: 12, marginLeft: 4 }}>
                       {Number(oracleData.change_24h_bps) >= 0 ? '+' : ''}{(Number(oracleData.change_24h_bps) / 100).toFixed(2)}%
                     </span>
+                  )}
+                  {lastFetched !== null && pricesStale && (
+                    <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading}
+                      title={`Price data is stale (${fmtTimeAgo(lastFetched)}). Click to refresh.`}>
+                      <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} />
+                    </button>
                   )}
                 </span>
             </div>

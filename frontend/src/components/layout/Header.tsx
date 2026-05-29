@@ -1,7 +1,7 @@
 import { useAccount, useApi } from '@gear-js/react-hooks';
 import { web3Accounts, web3Enable } from '@polkadot/extension-dapp';
 import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
-import { Wallet, UserPlus, Menu, TrendingUp, TrendingDown } from 'lucide-react';
+import { Wallet, UserPlus, Menu, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import styles from './Header.module.css';
 import { usePortfolio } from '../../hooks/usePortfolio';
@@ -14,17 +14,25 @@ interface HeaderProps {
   onMenuClick: () => void;
 }
 
+const STALE_MS = 5 * 60 * 1000;
+
+function fmtTimeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  if (m >= 1) return `${m}m ${s}s ago`;
+  return `${s}s ago`;
+}
+
 export function Header({ onMenuClick }: HeaderProps) {
   const { account, login, logout } = useAccount();
   const { isApiReady } = useApi();
   const { portfolio, join, loading } = usePortfolio();
   const { success, error } = useToast();
   const { isMobile } = useViewport();
-  const { prices, lastFetched } = useMarketData();
+  const { prices, lastFetched, pricesStale, pricesLoading, fetchPrices } = useMarketData();
   const [showAccountSelector, setShowAccountSelector] = useState(false);
   const joinedRef = useRef(false);
-
-  const prevPortfolio = useRef(portfolio);
 
   const handleConnect = useCallback(async () => {
     const exts = await web3Enable('thebookdex');
@@ -64,6 +72,14 @@ export function Header({ onMenuClick }: HeaderProps) {
     joinedRef.current = true;
     await join();
   }, [join]);
+
+  const handleRefreshPrices = useCallback(() => {
+    if (!account) {
+      error('Connect a wallet first to refresh prices.');
+      return;
+    }
+    fetchPrices();
+  }, [account, fetchPrices, error]);
 
   const formatUsd = (val: bigint | number | string) => {
     return (Number(val) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -108,6 +124,13 @@ export function Header({ onMenuClick }: HeaderProps) {
                 )}
               </div>
             ))}
+            {lastFetched !== null && pricesStale && (
+              <button className={styles.staleBtn} onClick={handleRefreshPrices} disabled={pricesLoading}
+                title={`Prices are stale (${fmtTimeAgo(lastFetched)}). Click to refresh.`}>
+                <RefreshCw size={14} className={pricesLoading ? styles.spin : ''} />
+                {pricesLoading ? 'Refreshing...' : `Stale (${fmtTimeAgo(lastFetched)})`}
+              </button>
+            )}
             {!account && !lastFetched && (
               <div className={styles.tickerHint}>Connect wallet for prices</div>
             )}

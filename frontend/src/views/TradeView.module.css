@@ -421,6 +421,37 @@
   color: var(--buy-green);
 }
 
+.stalePriceBtn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 2px;
+  margin-left: 4px;
+  opacity: 0.7;
+  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+}
+
+.stalePriceBtn:hover {
+  opacity: 1;
+}
+
+.stalePriceBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@keyframes spin360 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin360 1s linear infinite;
+}
+
 /* ── Mobile stats stacking ── */
 @media (max-width: 400px) {
   .marketStats {

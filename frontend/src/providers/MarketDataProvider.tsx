@@ -17,6 +17,8 @@ interface MarketPrices {
   VARA: PriceFeed | null;
 }
 
+const STALE_MS = 5 * 60 * 1000;
+
 interface MarketContextValue {
   prices: MarketPrices;
   orderbooks: Record<string, OrderbookData>;
@@ -25,12 +27,15 @@ interface MarketContextValue {
   leaders: LeaderEntry[];
   loading: boolean;
   lastFetched: number | null;
+  pricesStale: boolean;
+  pricesLoading: boolean;
   fetchPrices: () => Promise<void>;
 }
 
 /* ── Helpers ── */
 
 const STORAGE_PRICES_KEY = 'thebookdex_prices';
+const STORAGE_TS_KEY = 'thebookdex_prices_ts';
 const ASSETS: Asset[] = ['BTC', 'ETH', 'VARA'];
 
 function loadCachedPrices(): MarketPrices {
@@ -41,9 +46,18 @@ function loadCachedPrices(): MarketPrices {
   return { BTC: null, ETH: null, VARA: null };
 }
 
-function saveCachedPrices(prices: MarketPrices) {
+function loadCachedTimestamp(): number | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_TS_KEY);
+    if (raw) return Number(raw);
+  } catch {}
+  return null;
+}
+
+function saveCachedPrices(prices: MarketPrices, ts: number) {
   try {
     localStorage.setItem(STORAGE_PRICES_KEY, JSON.stringify(prices));
+    localStorage.setItem(STORAGE_TS_KEY, String(ts));
   } catch {}
 }
 
@@ -57,6 +71,8 @@ const MarketContext = createContext<MarketContextValue>({
   leaders: [],
   loading: true,
   lastFetched: null,
+  pricesStale: false,
+  pricesLoading: false,
   fetchPrices: async () => {},
 });
 
@@ -68,15 +84,18 @@ export function useMarketData() {
 
 export function MarketDataProvider({ children }: { children: ReactNode }) {
   const { account } = useAccount();
-  const { program, isReady } = useSails();
+  const { program } = useSails();
   const [prices, setPrices] = useState<MarketPrices>(loadCachedPrices);
   const [orderbooks, setOrderbooks] = useState<Record<string, OrderbookData>>({});
   const [trades, setTrades] = useState<Record<string, any[]>>({});
   const [pools, setPools] = useState<Pool[]>([]);
   const [leaders, setLeaders] = useState<LeaderEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastFetched, setLastFetched] = useState<number | null>(null);
+  const [lastFetched, setLastFetched] = useState<number | null>(loadCachedTimestamp);
+  const [pricesLoading, setPricesLoading] = useState(false);
   const fetchingRef = useRef(false);
+
+  const pricesStale = lastFetched !== null && Date.now() - lastFetched > STALE_MS;
 
   /* Fetch public data: orderbook + trades + pools + leaderboard */
   useEffect(() => {
@@ -88,7 +107,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       setLoading(true);
 
       const results = await Promise.allSettled([
-        /* Orderbook + trades for all 3 assets */
         ...ASSETS.map(async (asset) => {
           const [obResult, tradesResult] = await Promise.all([
             program.orderbook.getOrderbook(asset).call().catch(() => null),
@@ -96,9 +114,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
           ]);
           return { asset, obResult, tradesResult };
         }),
-        /* Pools */
         program.amm.listPools().call().catch(() => []),
-        /* Leaderboard */
         program.orderbook.getLeaderboard(10).call().catch(() => []),
       ]);
 
@@ -141,7 +157,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         setLeaders(leadersResult.value as LeaderEntry[]);
       }
 
-      setLastFetched(Date.now());
       setLoading(false);
     };
 
@@ -150,10 +165,11 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [program]);
 
-  /* Fetch oracle prices (needs wallet — uses whichever account is connected) */
+  /* Fetch oracle prices (needs wallet) */
   const fetchPrices = useCallback(async () => {
     if (!program || !account || fetchingRef.current) return;
     fetchingRef.current = true;
+    setPricesLoading(true);
 
     const { signer } = await web3FromSource(account.meta.source);
     const newPrices: MarketPrices = { ...loadCachedPrices() };
@@ -175,19 +191,22 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     }
 
     if (changed) {
+      const ts = Date.now();
       setPrices(newPrices);
-      saveCachedPrices(newPrices);
+      setLastFetched(ts);
+      saveCachedPrices(newPrices, ts);
     }
 
     fetchingRef.current = false;
+    setPricesLoading(false);
   }, [program, account]);
 
-  /* Auto-fetch prices when wallet connects */
+  /* Auto-fetch prices when wallet connects and prices are stale */
   useEffect(() => {
-    if (program && account) {
+    if (program && account && (lastFetched === null || pricesStale)) {
       fetchPrices();
     }
-  }, [program, account, fetchPrices]);
+  }, [program, account, fetchPrices, lastFetched, pricesStale]);
 
   return (
     <MarketContext.Provider value={{
@@ -198,6 +217,8 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       leaders,
       loading,
       lastFetched,
+      pricesStale,
+      pricesLoading,
       fetchPrices,
     }}>
       {children}

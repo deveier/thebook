@@ -130,6 +130,41 @@
   cursor: not-allowed;
 }
 
+.staleBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(240, 185, 50, 0.12);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid rgba(240, 185, 50, 0.25);
+  min-height: 28px;
+  transition: all var(--transition-fast);
+}
+
+.staleBtn:hover {
+  background: rgba(240, 185, 50, 0.2);
+}
+
+.staleBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes spin360 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin360 1s linear infinite;
+}
+
 @media (max-width: 767px) {
   .header {
     padding: 0 var(--space-sm);
