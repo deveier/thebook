@@ -171,11 +171,11 @@ export function TradeView() {
         </button>
       );
     }
-    if (!account) return 'Connect wallet';
+    if (!account) return '---';
     return (
       <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading}
         title="Click to sign a tx & fetch oracle price">
-        {pricesLoading ? <><RefreshCw size={12} className={styles.spin} /> Loading...</> : 'Loading...'}
+        {pricesLoading ? <><RefreshCw size={12} className={styles.spin} /> Loading...</> : '---'}
       </button>
     );
   };

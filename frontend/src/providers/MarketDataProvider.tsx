@@ -104,10 +104,8 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     if (initLoadedRef.current) return;
     initLoadedRef.current = true;
     loadSharedPrices().then(({ prices: sp, timestamp }) => {
-      if (sp.BTC || sp.ETH || sp.VARA) {
-        setPrices(sp);
-        if (timestamp) setLastFetched(timestamp);
-      }
+      setPrices(sp);
+      if (timestamp) setLastFetched(timestamp);
     });
   }, []);
 
