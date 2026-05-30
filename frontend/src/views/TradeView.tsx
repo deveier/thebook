@@ -159,15 +159,23 @@ export function TradeView() {
   };
 
   const renderPrice = () => {
+    const isStale = oraclePrice > 0 && lastFetched !== null && pricesStale;
     if (oraclePrice > 0) {
       if (!account) {
-        return <>${oraclePrice.toFixed(2)}</>;
+        return (
+          <span className={styles.priceWithHint}>
+            <span>${oraclePrice.toFixed(2)}</span>
+            {isStale && <span className={styles.staleHint}>(outdated · connect wallet to refresh)</span>}
+          </span>
+        );
       }
       const staleTitle = lastFetched ? `Price is stale (${fmtTimeAgo(lastFetched)}). Click to sign a tx & refresh.` : 'Click to refresh price';
       return (
         <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading} title={staleTitle}>
-          ${oraclePrice.toFixed(2)}
-          <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} style={{ marginLeft: 4 }} />
+          <span className={styles.priceWithHint}>
+            <span>${oraclePrice.toFixed(2)} <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} /></span>
+            {isStale && <span className={styles.staleHint}>outdated · tap to refresh</span>}
+          </span>
         </button>
       );
     }

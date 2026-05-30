@@ -424,14 +424,15 @@
 .stalePriceBtn {
   background: none;
   border: none;
-  color: var(--primary);
+  color: inherit;
   cursor: pointer;
-  padding: 2px;
-  margin-left: 4px;
+  padding: 0;
   opacity: 0.7;
-  vertical-align: middle;
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+  text-align: left;
 }
 
 .stalePriceBtn:hover {
@@ -441,6 +442,20 @@
 .stalePriceBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.priceWithHint {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.staleHint {
+  font-size: 9px;
+  color: #f0b90b;
+  opacity: 0.8;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 @keyframes spin360 {

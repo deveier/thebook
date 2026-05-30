@@ -122,6 +122,9 @@ export function Header({ onMenuClick }: HeaderProps) {
                     {(Number(data.change_24h_bps) / 100).toFixed(2)}%
                   </span>
                 )}
+                {data?.price_usd_micro && lastFetched !== null && pricesStale && (
+                  <span className={styles.tickerStaleHint}>outdated</span>
+                )}
               </button>
             ))}
             {lastFetched !== null && pricesStale && (

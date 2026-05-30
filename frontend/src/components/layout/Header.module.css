@@ -156,6 +156,14 @@
   cursor: not-allowed;
 }
 
+.tickerStaleHint {
+  font-size: 9px;
+  color: #f0b90b;
+  opacity: 0.8;
+  line-height: 1;
+  display: block;
+}
+
 @keyframes spin360 {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
