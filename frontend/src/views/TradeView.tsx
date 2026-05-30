@@ -10,6 +10,7 @@ import { useViewport } from '../hooks/useViewport';
 import { useTxStatus, TxStatusOverlay } from '../components/ui/TxStatus';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useMarketData } from '../providers/MarketDataProvider';
+import { TradeChart } from '../components/chart/TradeChart';
 
 type PanelId = 'chart' | 'orderbook' | 'trades' | 'entry';
 
@@ -238,9 +239,13 @@ export function TradeView() {
             )}
          </div>
       </div>
-      <div className={styles.placeholder}>
-         Chart Visualization (Coming Soon)
-      </div>
+      <TradeChart
+        trades={tradesList}
+        oraclePrice={oraclePrice}
+        bids={orderbook.bids}
+        asks={orderbook.asks}
+        asset={asset}
+      />
     </Card>
   );
 
