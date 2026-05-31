@@ -164,11 +164,18 @@
   border-radius: var(--radius-sm);
   font-weight: 600;
   font-size: var(--font-size-sm);
+  transition: all var(--transition-fast);
+}
+
+.buyBtn {
+  background: var(--buy-green);
   color: #fff;
 }
 
-.buyBtn { background: var(--buy-green); }
-.sellBtn { background: var(--card-bg-hover); color: var(--text-secondary); }
+.sellBtn {
+  background: var(--sell-red);
+  color: #fff;
+}
 
 .formGroup {
   margin-bottom: var(--space-md);
@@ -313,30 +320,28 @@
 }
 
 .inactive {
-  opacity: 0.4;
-  background: var(--card-bg-hover) !important;
-  color: var(--text-secondary) !important;
+  opacity: 0.35;
+  filter: saturate(0.3);
 }
 
-.submitBuy {
+.submitBuy, .submitSell {
   width: 100%;
   padding: var(--space-md);
-  background: var(--buy-green);
   color: #fff;
   border-radius: var(--radius-sm);
   font-weight: 700;
   font-size: var(--font-size-base);
+  letter-spacing: 0.02em;
+  transition: filter var(--transition-fast);
+  min-height: 48px;
 }
 
-.submitSell {
-  width: 100%;
-  padding: var(--space-md);
-  background: var(--sell-red);
-  color: #fff;
-  border-radius: var(--radius-sm);
-  font-weight: 700;
-  font-size: var(--font-size-base);
-}
+.submitBuy:hover:not(:disabled) { filter: brightness(1.1); }
+.submitSell:hover:not(:disabled) { filter: brightness(1.1); }
+.submitBuy:disabled, .submitSell:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.submitBuy { background: var(--buy-green); }
+.submitSell { background: var(--sell-red); }
 
 .orderTypeTabs {
   display: grid;
