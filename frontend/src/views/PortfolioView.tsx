@@ -22,7 +22,7 @@ export function PortfolioView() {
 
   useEffect(() => {
     if (!program || !isReady || !account) return;
-    program.orderbook.getMyOrders().withAddress(account.address).call().then(result => {
+    program.orderbook.getMyOrders().withAddress(account.decodedAddress).call().then(result => {
       if (result && Array.isArray(result)) setOrders(result);
     }).catch(console.error);
   }, [program, isReady, account]);
@@ -81,10 +81,10 @@ export function PortfolioView() {
   }
 
   const assets = [
+    { name: 'USD',  amount: portfolio.usd,  decimals: 2 },
+    { name: 'BTC',  amount: portfolio.btc,  decimals: 8 },
+    { name: 'ETH',  amount: portfolio.eth,  decimals: 8 },
     { name: 'VARA', amount: portfolio.vara, decimals: 8 },
-    { name: 'BTC', amount: portfolio.btc, decimals: 8 },
-    { name: 'ETH', amount: portfolio.eth, decimals: 6 },
-    { name: 'USD', amount: portfolio.usd, decimals: 2 },
   ];
 
   return (

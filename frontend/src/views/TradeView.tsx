@@ -37,7 +37,7 @@ export function TradeView() {
   const handleAssetChange = (a: Asset) => {
     setAsset(a);
     if (pricesStale && account && !pricesLoading) {
-      fetchPrices();
+      fetchPrice(asset);
     }
   };
   const [price, setPrice] = useState('');
@@ -45,7 +45,8 @@ export function TradeView() {
   const [mobilePanel, setMobilePanel] = useState<PanelId>('chart');
   const { isMobile } = useViewport();
 
-  const { prices, orderbooks, trades, loading: marketLoading, lastFetched, pricesStale, pricesLoading, fetchPrices, refreshAll } = useMarketData();
+  const { prices, orderbooks, trades, loading: marketLoading, lastFetched, pricesStalePer, pricesLoading, priceHistory, fetchPrice, fetchPrices, refreshAll } = useMarketData();
+  const pricesStale = pricesStalePer[asset];
   const { portfolio, refresh: refreshPortfolio } = usePortfolio();
   const { program, account } = useSails();
   const { success, error } = useToast();
@@ -79,9 +80,8 @@ export function TradeView() {
     if (!portfolio) return { value: 0n, label: '$0.00', decimals: 2 };
     if (orderType === 'Market' || side === 'Sell') {
       const amt = asset === 'BTC' ? portfolio.btc : asset === 'ETH' ? portfolio.eth : portfolio.vara;
-      const decimals = asset === 'ETH' ? 6 : 8;
-      const formatted = (Number(amt) / 10**decimals).toLocaleString(undefined, { maximumFractionDigits: 6 });
-      return { value: amt, label: formatted, decimals };
+      const formatted = (Number(amt) / 10**8).toLocaleString(undefined, { maximumFractionDigits: 8 });
+      return { value: amt, label: formatted, decimals: 8 };
     }
     return { value: portfolio.usd, label: `$${(Number(portfolio.usd) / 100).toLocaleString()}`, decimals: 2 };
   }, [portfolio, side, orderType, asset]);
@@ -116,8 +116,8 @@ export function TradeView() {
   const handlePlaceOrder = async () => {
     if (!program || !account || !qty) return;
     if (pricesStale && !pricesLoading) {
-      success('Price is stale — signing a refresh tx now. Please approve in your wallet.');
-      await fetchPrices();
+      success(`${asset} price is stale — signing a quick refresh. Please approve in your wallet.`);
+      await fetchPrice(asset);
     }
     const parsedQty = parseFloat(qty);
     if (isNaN(parsedQty) || parsedQty <= 0) {
@@ -173,7 +173,7 @@ export function TradeView() {
       }
       const staleTitle = lastFetched ? `Price is stale (${fmtTimeAgo(lastFetched)}). Click to sign a tx & refresh.` : 'Click to refresh price';
       return (
-        <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading} title={staleTitle}>
+        <button className={styles.stalePriceBtn} onClick={() => fetchPrice(asset)} disabled={pricesLoading} title={staleTitle}>
           <span className={styles.priceWithHint}>
             <span>${oraclePrice.toFixed(2)} <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} /></span>
             {isStale && <span className={styles.staleHint}>outdated · tap to refresh</span>}
@@ -183,7 +183,7 @@ export function TradeView() {
     }
     if (!account) return '---';
     return (
-      <button className={styles.stalePriceBtn} onClick={() => fetchPrices()} disabled={pricesLoading}
+      <button className={styles.stalePriceBtn} onClick={() => fetchPrice(asset)} disabled={pricesLoading}
         title="Click to sign a tx & fetch oracle price">
         {pricesLoading ? <><RefreshCw size={12} className={styles.spin} /> Loading...</> : '---'}
       </button>
@@ -243,6 +243,7 @@ export function TradeView() {
       <TradeChart
         trades={tradesList}
         oraclePrice={oraclePrice}
+        priceHistory={priceHistory}
         bids={orderbook.bids}
         asks={orderbook.asks}
         asset={asset}

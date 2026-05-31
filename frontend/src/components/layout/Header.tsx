@@ -29,7 +29,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { portfolio, join, loading } = usePortfolio();
   const { error } = useToast();
   const { isMobile } = useViewport();
-  const { prices, lastFetched, pricesStale, pricesLoading, fetchPrices } = useMarketData();
+  const { prices, lastFetched, pricesStale, pricesStalePer, pricesLoading, fetchPrices, fetchPrice } = useMarketData();
   const [showAccountSelector, setShowAccountSelector] = useState(false);
   const joinedRef = useRef(false);
 
@@ -105,34 +105,34 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* Public price ticker — always visible */}
         {!isMobile && (
           <div className={styles.ticker}>
-            {priceTicker.map(({ asset, data }) => (
-              <button key={asset} className={styles.tickerItem} onClick={handleRefreshPrices} disabled={pricesLoading}
-                title="Click to sign a tx & refresh oracle prices">
-                <span className={styles.tickerAsset}>{asset}</span>
-                <span className={styles.tickerPrice}>
-                  {data?.price_usd_micro
-                    ? `$${(Number(data.price_usd_micro) / 1_000_000).toFixed(2)}`
-                    : '---'}
-                </span>
-                {data?.change_24h_bps !== undefined && (
-                  <span className={Number(data.change_24h_bps) >= 0 ? styles.tickerUp : styles.tickerDown}>
-                    {Number(data.change_24h_bps) >= 0
-                      ? <TrendingUp size={12} />
-                      : <TrendingDown size={12} />}
-                    {(Number(data.change_24h_bps) / 100).toFixed(2)}%
+            {priceTicker.map(({ asset, data }) => {
+              const isStale = pricesStalePer[asset as Asset];
+              return (
+                <button key={asset} className={styles.tickerItem} disabled={pricesLoading}
+                  onClick={() => account ? fetchPrice(asset as Asset) : handleRefreshPrices()}
+                  title={account ? `Click to refresh ${asset} price (1 signature)` : 'Connect wallet for prices'}>
+                  <span className={styles.tickerAsset}>{asset}</span>
+                  <span className={styles.tickerPrice}>
+                    {data?.price_usd_micro
+                      ? `$${(Number(data.price_usd_micro) / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '---'}
                   </span>
-                )}
-                {data?.price_usd_micro && lastFetched !== null && pricesStale && (
-                  <span className={styles.tickerStaleHint}>outdated</span>
-                )}
-              </button>
-            ))}
-            {lastFetched !== null && pricesStale && (
-              <button className={styles.staleBtn} onClick={handleRefreshPrices} disabled={pricesLoading}
-                title={`Prices are stale (${fmtTimeAgo(lastFetched)}). Click to refresh.`}>
-                <RefreshCw size={14} className={pricesLoading ? styles.spin : ''} />
-                {pricesLoading ? 'Refreshing...' : `Stale (${fmtTimeAgo(lastFetched)})`}
-              </button>
+                  {data?.change_24h_bps !== undefined && (
+                    <span className={Number(data.change_24h_bps) >= 0 ? styles.tickerUp : styles.tickerDown}>
+                      {Number(data.change_24h_bps) >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                      {(Number(data.change_24h_bps) / 100).toFixed(2)}%
+                    </span>
+                  )}
+                  {data?.price_usd_micro && isStale && (
+                    <span className={styles.tickerStaleHint}>outdated · tap</span>
+                  )}
+                </button>
+              );
+            })}
+            {pricesLoading && (
+              <span className={styles.tickerHint}>
+                <RefreshCw size={12} className={styles.spin} /> Fetching...
+              </span>
             )}
             {!account && !lastFetched && (
               <div className={styles.tickerHint}>Connect wallet for prices</div>

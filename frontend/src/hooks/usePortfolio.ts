@@ -18,15 +18,20 @@ export function usePortfolio() {
     if (!program || !account) return;
 
     try {
-      const result = await program.orderbook.getPortfolio().withAddress(account.address).call();
+      /* decodedAddress is hex (0x...) — required by sails-js QueryBuilder */
+      const result = await program.orderbook.getPortfolio().withAddress(account.decodedAddress).call();
 
       if (result && Array.isArray(result)) {
-        setPortfolio({
-          usd: BigInt(result[0]?.toString() || '0'),
-          btc: BigInt(result[1]?.toString() || '0'),
-          eth: BigInt(result[2]?.toString() || '0'),
-          vara: BigInt(result[3]?.toString() || '0'),
-        });
+        const usd  = BigInt(result[0]?.toString() || '0');
+        const btc  = BigInt(result[1]?.toString() || '0');
+        const eth  = BigInt(result[2]?.toString() || '0');
+        const vara = BigInt(result[3]?.toString() || '0');
+        /* Keep null (→ show Join DEX) if the account hasn't joined yet */
+        if (usd === 0n && btc === 0n && eth === 0n && vara === 0n) {
+          setPortfolio(null);
+        } else {
+          setPortfolio({ usd, btc, eth, vara });
+        }
       }
     } catch (e) {
       console.error('Failed to fetch portfolio:', e);

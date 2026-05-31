@@ -5,10 +5,12 @@ import {
   type IChartApi, type UTCTimestamp,
 } from 'lightweight-charts';
 import styles from './TradeChart.module.css';
+import type { PricePoint } from '../../providers/MarketDataProvider';
 
 interface TradeChartProps {
   trades: { price: bigint; qty: bigint }[];
   oraclePrice: number;
+  priceHistory: PricePoint[];
   bids: [bigint, bigint][];
   asks: [bigint, bigint][];
   asset: string;
@@ -171,7 +173,7 @@ function DepthCanvas({ bids, asks }: { bids: { price: number; cum: number }[]; a
 
 /* ── Main component ── */
 
-export function TradeChart({ trades, oraclePrice, bids, asks }: TradeChartProps) {
+export function TradeChart({ trades, oraclePrice, priceHistory, bids, asks, asset }: TradeChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [view, setView] = useState<ChartView>('price');
@@ -252,7 +254,25 @@ export function TradeChart({ trades, oraclePrice, bids, asks }: TradeChartProps)
       priceSeries.setData(tradeData);
     }
 
-    if (oraclePrice > 0 && tradeData.length > 0) {
+    /* Oracle price line — use history if available, else flat reference */
+    const oracleHistoryData = priceHistory
+      .map(p => ({
+        time: Math.floor(p.ts / 1000) as UTCTimestamp,
+        value: (p[asset as keyof PricePoint] as number | null) ?? 0,
+      }))
+      .filter(d => d.value > 0);
+
+    if (oracleHistoryData.length >= 2) {
+      const oLine = chart.addSeries(LineSeries, {
+        color: '#2196f3',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        lastValueVisible: true,
+        priceLineVisible: false,
+        title: 'Oracle',
+      });
+      oLine.setData(oracleHistoryData);
+    } else if (oraclePrice > 0 && tradeData.length > 0) {
       const oLine = chart.addSeries(LineSeries, {
         color: '#474d57',
         lineWidth: 1,
@@ -296,7 +316,7 @@ export function TradeChart({ trades, oraclePrice, bids, asks }: TradeChartProps)
       chart.remove();
       chartRef.current = null;
     };
-  }, [tradeData, oraclePrice, view]);
+  }, [tradeData, oraclePrice, priceHistory, asset, view]);
 
   return (
     <div className={styles.wrapper}>

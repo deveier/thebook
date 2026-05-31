@@ -45,9 +45,9 @@ export function LeaderboardView() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ color: 'var(--buy-green)', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 14 }}>
-                    ${Number(l.usd) / 100}
+                    ${(Number(l.usd) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>Net: ${Number(l.net_worth) / 100}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>Net: ${(Number(l.net_worth) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
               </div>
             </Card>
@@ -77,8 +77,8 @@ export function LeaderboardView() {
                   {rankIcon(i) || <span style={{ color: 'var(--text-secondary)' }}>{i + 1}</span>}
                 </td>
                 <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)', fontSize: 14 }}>{l.id.slice(0, 6)}...{l.id.slice(-4)}</td>
-                <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', textAlign: 'right', color: 'var(--buy-green)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>${Number(l.usd) / 100}</td>
-                <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>${Number(l.net_worth) / 100}</td>
+                <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', textAlign: 'right', color: 'var(--buy-green)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>${(Number(l.usd) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style={{ padding: 16, borderBottom: '1px solid var(--border-color)', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>${(Number(l.net_worth) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             ))}
           </tbody>

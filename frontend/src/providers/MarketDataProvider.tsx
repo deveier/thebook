@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo, type ReactNode } from 'react';
 import { useAccount } from '@gear-js/react-hooks';
 import { web3FromSource } from '@polkadot/extension-dapp';
 import { useSails } from '../hooks/useSails';
@@ -17,7 +17,16 @@ interface MarketPrices {
   VARA: PriceFeed | null;
 }
 
+export interface PricePoint {
+  ts: number;
+  BTC: number | null;
+  ETH: number | null;
+  VARA: number | null;
+}
+
 const STALE_MS = 5 * 60 * 1000;
+const POLL_MS  = 5_000;
+const MAX_HISTORY = 200;
 
 interface MarketContextValue {
   prices: MarketPrices;
@@ -27,9 +36,13 @@ interface MarketContextValue {
   leaders: LeaderEntry[];
   loading: boolean;
   lastFetched: number | null;
+  lastFetchedPerAsset: Record<Asset, number | null>;
   pricesStale: boolean;
+  pricesStalePer: Record<Asset, boolean>;
   pricesLoading: boolean;
+  priceHistory: PricePoint[];
   fetchPrices: () => Promise<void>;
+  fetchPrice: (asset: Asset) => Promise<void>;
   refreshAll: () => void;
 }
 
@@ -42,28 +55,40 @@ function defaultPrices(): MarketPrices {
   return { BTC: null, ETH: null, VARA: null };
 }
 
-async function loadSharedPrices(): Promise<{ prices: MarketPrices; timestamp: number | null }> {
+function priceToUsd(feed: PriceFeed | null): number | null {
+  if (!feed) return null;
+  return Number(feed.price_usd_micro) / 1_000_000;
+}
+
+async function loadSharedPrices(): Promise<{ prices: MarketPrices; timestamp: number | null; history: PricePoint[] }> {
   try {
     const res = await fetch(API_URL);
     if (res.ok) {
       const data = await res.json();
-      if (data.prices) return { prices: data.prices, timestamp: data.timestamp ?? null };
+      if (data.prices) return {
+        prices: data.prices,
+        timestamp: data.timestamp ?? null,
+        history: Array.isArray(data.history) ? data.history : [],
+      };
     }
   } catch {}
-  return { prices: defaultPrices(), timestamp: null };
+  return { prices: defaultPrices(), timestamp: null, history: [] };
 }
 
-async function saveSharedPrices(prices: MarketPrices, ts: number) {
+async function saveSharedPrices(prices: MarketPrices, ts: number, history: PricePoint[]) {
   try {
     await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prices, timestamp: ts }),
+      body: JSON.stringify({ prices, timestamp: ts, history }),
     });
   } catch {}
 }
 
 /* ── Context ── */
+
+const defaultPerAsset: Record<Asset, number | null> = { BTC: null, ETH: null, VARA: null };
+const defaultStalePer: Record<Asset, boolean> = { BTC: false, ETH: false, VARA: false };
 
 const MarketContext = createContext<MarketContextValue>({
   prices: { BTC: null, ETH: null, VARA: null },
@@ -73,9 +98,13 @@ const MarketContext = createContext<MarketContextValue>({
   leaders: [],
   loading: true,
   lastFetched: null,
+  lastFetchedPerAsset: defaultPerAsset,
   pricesStale: false,
+  pricesStalePer: defaultStalePer,
   pricesLoading: false,
+  priceHistory: [],
   fetchPrices: async () => {},
+  fetchPrice: async () => {},
   refreshAll: () => {},
 });
 
@@ -84,8 +113,6 @@ export function useMarketData() {
 }
 
 /* ── Provider ── */
-
-const POLL_MS = 5_000;
 
 export function MarketDataProvider({ children }: { children: ReactNode }) {
   const { account } = useAccount();
@@ -97,24 +124,43 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
   const [leaders, setLeaders] = useState<LeaderEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastFetched, setLastFetched] = useState<number | null>(null);
+  const [lastFetchedPerAsset, setLastFetchedPerAsset] = useState<Record<Asset, number | null>>(defaultPerAsset);
   const [pricesLoading, setPricesLoading] = useState(false);
+  const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const fetchingRef = useRef(false);
   const initLoadedRef = useRef(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pricesRef = useRef(prices);
+  const historyRef = useRef(priceHistory);
+  pricesRef.current = prices;
+  historyRef.current = priceHistory;
 
   const pricesStale = lastFetched !== null && Date.now() - lastFetched > STALE_MS;
+  const pricesStalePer = useMemo<Record<Asset, boolean>>(() => {
+    const now = Date.now();
+    return {
+      BTC:  lastFetchedPerAsset.BTC  !== null && now - lastFetchedPerAsset.BTC  > STALE_MS,
+      ETH:  lastFetchedPerAsset.ETH  !== null && now - lastFetchedPerAsset.ETH  > STALE_MS,
+      VARA: lastFetchedPerAsset.VARA !== null && now - lastFetchedPerAsset.VARA > STALE_MS,
+    };
+  }, [lastFetchedPerAsset]);
 
-  /* Load shared prices from the server on mount */
+  /* Load shared prices + history from server on mount */
   useEffect(() => {
     if (initLoadedRef.current) return;
     initLoadedRef.current = true;
-    loadSharedPrices().then(({ prices: sp, timestamp }) => {
+    loadSharedPrices().then(({ prices: sp, timestamp, history }) => {
       setPrices(sp);
-      if (timestamp) setLastFetched(timestamp);
+      if (timestamp) {
+        setLastFetched(timestamp);
+        /* Seed per-asset from the shared timestamp (best-effort) */
+        setLastFetchedPerAsset({ BTC: timestamp, ETH: timestamp, VARA: timestamp });
+      }
+      if (history.length) setPriceHistory(history);
     });
   }, []);
 
-  /* Core data fetch: orderbook + trades + pools + leaderboard */
+  /* Core market data fetch */
   const fetchAll = useCallback(async (programRef: typeof program) => {
     if (!programRef) return;
     const results = await Promise.allSettled([
@@ -164,29 +210,65 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
   /* Initial load + 5s polling */
   useEffect(() => {
     if (!program) return;
-
     let active = true;
-
     const run = async () => {
       setLoading(true);
       await fetchAll(program);
       if (active) setLoading(false);
     };
-
     run();
-
     pollRef.current = setInterval(() => { if (active) fetchAll(program); }, POLL_MS);
-
     return () => {
       active = false;
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [program, fetchAll]);
 
-  /* refreshAll: call after any transaction to immediately sync state */
+  /* refreshAll: call after any transaction */
   const refreshAll = useCallback(() => { fetchAll(program); }, [fetchAll, program]);
 
-  /* Fetch oracle prices (needs wallet — only call from user gesture, not from effects/interval) */
+  /* ── Helper: append a price snapshot to history ── */
+  const appendHistory = useCallback((merged: MarketPrices): PricePoint[] => {
+    const point: PricePoint = {
+      ts: Date.now(),
+      BTC:  priceToUsd(merged.BTC),
+      ETH:  priceToUsd(merged.ETH),
+      VARA: priceToUsd(merged.VARA),
+    };
+    const next = [...historyRef.current.slice(-(MAX_HISTORY - 1)), point];
+    setPriceHistory(next);
+    return next;
+  }, []);
+
+  /* ── fetchPrice: sign ONE tx for ONE asset ── */
+  const fetchPrice = useCallback(async (asset: Asset) => {
+    if (!program || !account || fetchingRef.current) return;
+    fetchingRef.current = true;
+    setPricesLoading(true);
+    try {
+      const { signer } = await web3FromSource(account.meta.source);
+      const transaction = program.orderbook.getLivePrice(asset);
+      await transaction.withAccount(account.address, { signer }).withValue(0n).calculateGas();
+      const { response } = await transaction.signAndSend();
+      const result = await response();
+      if (result && typeof result === 'object' && 'ok' in result) {
+        const ts = Date.now();
+        const merged: MarketPrices = { ...pricesRef.current, [asset]: result.ok as PriceFeed };
+        setPrices(merged);
+        setLastFetched(ts);
+        setLastFetchedPerAsset(prev => ({ ...prev, [asset]: ts }));
+        const nextHistory = appendHistory(merged);
+        saveSharedPrices(merged, ts, nextHistory);
+      }
+    } catch (e) {
+      console.error(`fetchPrice(${asset}) failed:`, e);
+    } finally {
+      fetchingRef.current = false;
+      setPricesLoading(false);
+    }
+  }, [program, account, appendHistory]);
+
+  /* ── fetchPrices: sign 3 txs for all assets (global refresh) ── */
   const fetchPrices = useCallback(async () => {
     if (!program || !account || fetchingRef.current) return;
     fetchingRef.current = true;
@@ -195,7 +277,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       const { signer } = await web3FromSource(account.meta.source);
       const newPrices: MarketPrices = { BTC: null, ETH: null, VARA: null };
       let changed = false;
-
       for (const asset of ASSETS) {
         try {
           const transaction = program.orderbook.getLivePrice(asset);
@@ -207,26 +288,27 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             changed = true;
           }
         } catch (e) {
-          console.error(`MarketDataProvider: Failed to fetch ${asset} price:`, e);
+          console.error(`fetchPrices: ${asset} failed:`, e);
         }
       }
-
       if (changed) {
         const ts = Date.now();
-        /* Merge: don't let failed fetches (null) overwrite existing prices */
-        const merged = { ...prices };
+        const merged: MarketPrices = { ...pricesRef.current };
+        const updatedTs: Partial<Record<Asset, number>> = {};
         for (const asset of ASSETS) {
-          if (newPrices[asset] !== null) merged[asset] = newPrices[asset];
+          if (newPrices[asset] !== null) { merged[asset] = newPrices[asset]; updatedTs[asset] = ts; }
         }
         setPrices(merged);
         setLastFetched(ts);
-        saveSharedPrices(merged, ts);
+        setLastFetchedPerAsset(prev => ({ ...prev, ...updatedTs }));
+        const nextHistory = appendHistory(merged);
+        saveSharedPrices(merged, ts, nextHistory);
       }
     } finally {
       fetchingRef.current = false;
       setPricesLoading(false);
     }
-  }, [program, account]);
+  }, [program, account, appendHistory]);
 
   return (
     <MarketContext.Provider value={{
@@ -237,9 +319,13 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       leaders,
       loading,
       lastFetched,
+      lastFetchedPerAsset,
       pricesStale,
+      pricesStalePer,
       pricesLoading,
+      priceHistory,
       fetchPrices,
+      fetchPrice,
       refreshAll,
     }}>
       {children}
