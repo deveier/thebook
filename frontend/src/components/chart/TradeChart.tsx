@@ -18,7 +18,38 @@ interface TradeChartProps {
 
 type ChartView = 'price' | 'depth';
 
+const CHART_BG = '#0d1117';
 const INTERVAL_SEC = 30;
+
+/* ── helpers ── */
+
+function buildTradeData(
+  trades: { price: bigint; qty: bigint }[],
+  timeframe: 'all' | '50' | '20',
+) {
+  let t = trades.slice().reverse();
+  if (timeframe !== 'all') t = t.slice(-parseInt(timeframe));
+  const now = Math.floor(Date.now() / 1000);
+  return t.map((tr, i) => ({
+    time: (now - (t.length - i) * INTERVAL_SEC) as UTCTimestamp,
+    value: Number(tr.price) * 1000,
+    volume: Number(tr.qty) / 10 ** 5,
+  }));
+}
+
+function buildOracleData(priceHistory: PricePoint[], asset: string) {
+  const seen = new Set<number>();
+  return priceHistory
+    .map(p => ({
+      time: Math.floor(p.ts / 1000) as UTCTimestamp,
+      value: (p[asset as keyof PricePoint] as number | null) ?? 0,
+    }))
+    .filter(d => {
+      if (d.value <= 0 || seen.has(d.time)) return false;
+      seen.add(d.time);
+      return true;
+    });
+}
 
 /* ── Depth canvas ── */
 
@@ -35,110 +66,97 @@ function drawDepth(
   canvas.width = rect.width * dpr;
   canvas.height = rect.height * dpr;
   ctx.scale(dpr, dpr);
-  const W = rect.width;
-  const H = rect.height;
-  const PAD = { top: 20, right: 16, bottom: 36, left: 68 };
+  const W = rect.width, H = rect.height;
+  const PAD = { top: 24, right: 16, bottom: 36, left: 68 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = CHART_BG;
+  ctx.fillRect(0, 0, W, H);
 
   const allPrices = [...bids.map(b => b.price), ...asks.map(a => a.price)];
   if (allPrices.length === 0) {
     ctx.fillStyle = '#848e9c';
     ctx.font = '13px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText('No open orders', W / 2, H / 2);
+    ctx.fillText('No open orders yet', W / 2, H / 2);
     return;
   }
 
-  const minP = allPrices[0];
-  const maxP = allPrices[allPrices.length - 1];
+  const minP = allPrices[0], maxP = allPrices[allPrices.length - 1];
   const priceSpan = maxP - minP || 1;
-  const maxBid = bids.length > 0 ? bids[bids.length - 1].cum : 0;
-  const maxAsk = asks.length > 0 ? asks[asks.length - 1].cum : 0;
-  const maxCum = Math.max(maxBid, maxAsk) || 1;
+  const maxCum = Math.max(
+    bids.length ? bids[bids.length - 1].cum : 0,
+    asks.length ? asks[asks.length - 1].cum : 0,
+  ) || 1;
   const vScale = plotH / maxCum;
 
-  function xP(p: number) { return PAD.left + ((p - minP) / priceSpan) * plotW; }
-  function yC(c: number) { return PAD.top + plotH - c * vScale; }
+  const xP = (p: number) => PAD.left + ((p - minP) / priceSpan) * plotW;
+  const yC = (c: number) => PAD.top + plotH - c * vScale;
 
-  ctx.clearRect(0, 0, W, H);
-
-  /* subtle grid */
-  ctx.strokeStyle = '#1e2329';
-  ctx.lineWidth = 1;
+  /* grid */
+  ctx.strokeStyle = '#1e2329'; ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = PAD.top + (plotH / 4) * i;
     ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
   }
 
-  /* bids */
-  if (bids.length >= 2) {
+  const drawArea = (pts: typeof bids, fill: string, stroke: string) => {
+    if (pts.length < 1) return;
     ctx.beginPath();
-    ctx.moveTo(xP(bids[0].price), PAD.top + plotH);
-    for (const b of bids) ctx.lineTo(xP(b.price), yC(b.cum));
-    ctx.lineTo(xP(bids[bids.length - 1].price), PAD.top + plotH);
+    ctx.moveTo(xP(pts[0].price), PAD.top + plotH);
+    for (const p of pts) ctx.lineTo(xP(p.price), yC(p.cum));
+    ctx.lineTo(xP(pts[pts.length - 1].price), PAD.top + plotH);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(38, 166, 154, 0.18)'; ctx.fill();
-    ctx.strokeStyle = '#26a69a'; ctx.lineWidth = 2;
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.strokeStyle = stroke; ctx.lineWidth = 2;
     ctx.beginPath();
-    bids.forEach((b, i) => i === 0 ? ctx.moveTo(xP(b.price), yC(b.cum)) : ctx.lineTo(xP(b.price), yC(b.cum)));
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(xP(p.price), yC(p.cum)) : ctx.lineTo(xP(p.price), yC(p.cum)));
     ctx.stroke();
-  }
+  };
 
-  /* asks */
-  if (asks.length >= 2) {
-    ctx.beginPath();
-    ctx.moveTo(xP(asks[0].price), PAD.top + plotH);
-    for (const a of asks) ctx.lineTo(xP(a.price), yC(a.cum));
-    ctx.lineTo(xP(asks[asks.length - 1].price), PAD.top + plotH);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(239, 83, 80, 0.18)'; ctx.fill();
-    ctx.strokeStyle = '#ef5350'; ctx.lineWidth = 2;
-    ctx.beginPath();
-    asks.forEach((a, i) => i === 0 ? ctx.moveTo(xP(a.price), yC(a.cum)) : ctx.lineTo(xP(a.price), yC(a.cum)));
-    ctx.stroke();
-  }
+  drawArea(bids, 'rgba(38,166,154,0.18)', '#26a69a');
+  drawArea(asks, 'rgba(239,83,80,0.18)', '#ef5350');
 
-  /* mid-price line */
-  if (bids.length > 0 && asks.length > 0) {
+  /* mid-price */
+  if (bids.length && asks.length) {
     const mid = asks[0].price;
-    ctx.strokeStyle = 'rgba(240,185,11,0.5)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(240,185,11,0.6)'; ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath(); ctx.moveTo(xP(mid), PAD.top); ctx.lineTo(xP(mid), PAD.top + plotH); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#f0b90b'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
-    ctx.fillText(`$${mid.toFixed(0)}`, xP(mid), PAD.top - 5);
+    ctx.fillStyle = '#f0b90b'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`$${mid.toFixed(0)}`, xP(mid), PAD.top - 6);
   }
 
-  /* axis labels */
-  ctx.fillStyle = '#848e9c'; ctx.font = '10px monospace';
-  ctx.textAlign = 'center';
-  const lcount = Math.min(5, allPrices.length);
-  for (let i = 0; i < lcount; i++) {
-    const idx = Math.floor((allPrices.length - 1) * (i / Math.max(lcount - 1, 1)));
-    const p = allPrices[idx];
+  /* price axis */
+  ctx.fillStyle = '#848e9c'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+  const lc = Math.min(5, allPrices.length);
+  for (let i = 0; i < lc; i++) {
+    const p = allPrices[Math.floor((allPrices.length - 1) * (i / Math.max(lc - 1, 1)))];
     ctx.fillText(`$${p.toFixed(0)}`, xP(p), H - 8);
   }
   ctx.textAlign = 'right';
   for (let i = 0; i <= 4; i++) {
-    const val = (maxCum / 4) * i;
-    const y = PAD.top + plotH - val * vScale;
-    ctx.fillText(val >= 1000 ? `${(val / 1000).toFixed(1)}K` : val.toFixed(2), PAD.left - 6, y + 4);
+    const v = (maxCum / 4) * i;
+    ctx.fillText(v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toFixed(2), PAD.left - 6, PAD.top + plotH - v * vScale + 4);
   }
 
   /* legend */
   ctx.textAlign = 'left';
-  ctx.fillStyle = '#26a69a'; ctx.fillText('▬ Bids', PAD.left, PAD.top - 5);
-  ctx.fillStyle = '#ef5350'; ctx.fillText('▬ Asks', PAD.left + 50, PAD.top - 5);
+  ctx.fillStyle = '#26a69a'; ctx.fillText('▬ Bids', PAD.left + 4, PAD.top - 8);
+  ctx.fillStyle = '#ef5350'; ctx.fillText('▬ Asks', PAD.left + 56, PAD.top - 8);
 }
 
 function DepthCanvas({ bids, asks }: { bids: { price: number; cum: number }[]; asks: { price: number; cum: number }[] }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => { if (ref.current) drawDepth(ref.current, bids, asks); }, [bids, asks]);
+  const draw = () => { if (ref.current) drawDepth(ref.current, bids, asks); };
+  useEffect(draw, [bids, asks]);
   useEffect(() => {
-    const fn = () => { if (ref.current) drawDepth(ref.current, bids, asks); };
-    window.addEventListener('resize', fn);
-    return () => window.removeEventListener('resize', fn);
+    window.addEventListener('resize', draw);
+    return () => window.removeEventListener('resize', draw);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bids, asks]);
   return <canvas ref={ref} className={styles.depthCanvas} />;
 }
@@ -147,69 +165,71 @@ function DepthCanvas({ bids, asks }: { bids: { price: number; cum: number }[]; a
 
 export function TradeChart({ trades, oraclePrice, priceHistory, bids, asks, asset }: TradeChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const priceRef = useRef<ISeriesApi<'Area'> | null>(null);
-  const oracleRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const volRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const chartRef     = useRef<IChartApi | null>(null);
+  const priceRef     = useRef<ISeriesApi<'Area'> | null>(null);
+  const oracleRef    = useRef<ISeriesApi<'Line'> | null>(null);
+  const volRef       = useRef<ISeriesApi<'Histogram'> | null>(null);
   const [view, setView] = useState<ChartView>('price');
   const [timeframe, setTimeframe] = useState<'all' | '50' | '20'>('all');
 
-  const tradeData = useMemo(() => {
-    let t = trades.slice().reverse();
-    if (timeframe !== 'all') t = t.slice(-parseInt(timeframe));
-    const now = Math.floor(Date.now() / 1000);
-    return t.map((trade, i) => ({
-      time: (now - (t.length - i) * INTERVAL_SEC) as UTCTimestamp,
-      value: Number(trade.price) * 1000,
-      volume: Number(trade.qty) / 10**5,
-    }));
-  }, [trades, timeframe]);
-
-  const oracleHistoryData = useMemo(() => {
-    const points = priceHistory
-      .map(p => ({
-        time: Math.floor(p.ts / 1000) as UTCTimestamp,
-        value: (p[asset as keyof PricePoint] as number | null) ?? 0,
-      }))
-      .filter(d => d.value > 0);
-    /* ensure unique ascending times */
-    const seen = new Set<number>();
-    return points.filter(d => {
-      if (seen.has(d.time)) return false;
-      seen.add(d.time);
-      return true;
-    });
-  }, [priceHistory, asset]);
+  const tradeData    = useMemo(() => buildTradeData(trades, timeframe), [trades, timeframe]);
+  const oracleData   = useMemo(() => buildOracleData(priceHistory, asset), [priceHistory, asset]);
 
   const depthBids = useMemo(() => {
-    const out: { price: number; cum: number }[] = [];
     let s = 0;
-    for (const [p, q] of bids) { s += Number(q) / 10**5; out.push({ price: Number(p) * 1000, cum: s }); }
-    return out;
+    return bids.map(([p, q]) => { s += Number(q) / 1e5; return { price: Number(p) * 1000, cum: s }; });
   }, [bids]);
-
   const depthAsks = useMemo(() => {
-    const out: { price: number; cum: number }[] = [];
     let s = 0;
-    for (const [p, q] of asks) { s += Number(q) / 10**5; out.push({ price: Number(p) * 1000, cum: s }); }
-    return out;
+    return asks.map(([p, q]) => { s += Number(q) / 1e5; return { price: Number(p) * 1000, cum: s }; });
   }, [asks]);
 
-  /* ── Create chart once ── */
+  /* ── Sync chart data (runs whenever deps change OR chart is recreated) ── */
+  const syncData = (
+    price: ISeriesApi<'Area'>,
+    oracle: ISeriesApi<'Line'>,
+    vol: ISeriesApi<'Histogram'>,
+    chart: IChartApi,
+    td: typeof tradeData,
+    od: typeof oracleData,
+    op: number,
+  ) => {
+    if (td.length > 0) {
+      price.setData(td);
+      vol.setData(td.map((d, i) => ({
+        time: d.time, value: d.volume,
+        color: i > 0 && d.value >= td[i - 1].value ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
+      })));
+    } else {
+      price.setData([]); vol.setData([]);
+    }
+
+    if (od.length >= 2) {
+      oracle.setData(od);
+    } else if (op > 0 && td.length > 0) {
+      oracle.setData(td.map(d => ({ time: d.time, value: op })));
+    } else {
+      oracle.setData([]);
+    }
+
+    if (td.length > 0 || od.length > 0) chart.timeScale().fitContent();
+  };
+
+  /* ── Create chart once per view-switch ── */
   useEffect(() => {
-    if (!containerRef.current || view !== 'price') return;
+    if (view !== 'price' || !containerRef.current) return;
 
     const chart = createChart(containerRef.current, {
-      autoSize: true,
+      width: containerRef.current.clientWidth,
+      height: containerRef.current.clientHeight || 340,
       layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
+        background: { type: ColorType.Solid, color: CHART_BG },
         textColor: '#848e9c',
         fontSize: 11,
-        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       },
       grid: {
-        vertLines: { color: 'rgba(30,35,41,0.8)' },
-        horzLines: { color: 'rgba(30,35,41,0.8)' },
+        vertLines: { color: '#1a1f26' },
+        horzLines: { color: '#1a1f26' },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
@@ -223,24 +243,22 @@ export function TradeChart({ trades, oraclePrice, priceHistory, bids, asks, asse
         fixLeftEdge: true,
         fixRightEdge: true,
       },
-      rightPriceScale: { borderColor: '#2b2f36', minimumWidth: 80 },
+      rightPriceScale: { borderColor: '#2b2f36', minimumWidth: 72 },
       handleScroll: true,
       handleScale: true,
     });
 
-    chartRef.current = chart;
-
-    priceRef.current = chart.addSeries(AreaSeries, {
+    const priceSeries = chart.addSeries(AreaSeries, {
       lineColor: '#f0b90b',
-      topColor: 'rgba(240,185,11,0.25)',
-      bottomColor: 'rgba(240,185,11,0.0)',
+      topColor: 'rgba(240,185,11,0.22)',
+      bottomColor: 'rgba(240,185,11,0.01)',
       lineWidth: 2,
       lastValueVisible: true,
       priceLineVisible: true,
       title: 'DEX',
     });
 
-    oracleRef.current = chart.addSeries(LineSeries, {
+    const oracleSeries = chart.addSeries(LineSeries, {
       color: '#2196f3',
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
@@ -249,50 +267,51 @@ export function TradeChart({ trades, oraclePrice, priceHistory, bids, asks, asse
       title: 'Oracle',
     });
 
-    volRef.current = chart.addSeries(HistogramSeries, {
+    const volSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
     });
     chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
 
-    return () => { chart.remove(); chartRef.current = null; priceRef.current = null; oracleRef.current = null; volRef.current = null; };
+    chartRef.current   = chart;
+    priceRef.current   = priceSeries;
+    oracleRef.current  = oracleSeries;
+    volRef.current     = volSeries;
+
+    /* Load initial data immediately */
+    syncData(priceSeries, oracleSeries, volSeries, chart, tradeData, oracleData, oraclePrice);
+
+    /* Resize handler */
+    const onResize = () => {
+      if (containerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight || 340,
+        });
+      }
+    };
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      chart.remove();
+      chartRef.current = null; priceRef.current = null; oracleRef.current = null; volRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
-  /* ── Update data without recreating chart ── */
+  /* ── Update data when it changes ── */
   useEffect(() => {
-    if (!chartRef.current || !priceRef.current || !volRef.current || !oracleRef.current) return;
+    if (!chartRef.current || !priceRef.current || !oracleRef.current || !volRef.current) return;
+    syncData(priceRef.current, oracleRef.current, volRef.current, chartRef.current, tradeData, oracleData, oraclePrice);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradeData, oracleData, oraclePrice]);
 
-    if (tradeData.length > 0) {
-      priceRef.current.setData(tradeData);
-      volRef.current.setData(
-        tradeData.map((d, i) => ({
-          time: d.time,
-          value: d.volume,
-          color: i > 0 && d.value >= tradeData[i - 1].value ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
-        }))
-      );
-    } else {
-      priceRef.current.setData([]);
-      volRef.current.setData([]);
-    }
-
-    if (oracleHistoryData.length >= 2) {
-      oracleRef.current.setData(oracleHistoryData);
-    } else if (oraclePrice > 0 && tradeData.length > 0) {
-      oracleRef.current.setData(tradeData.map(d => ({ time: d.time, value: oraclePrice })));
-    } else {
-      oracleRef.current.setData([]);
-    }
-
-    if (tradeData.length > 0 || oracleHistoryData.length > 0) {
-      chartRef.current.timeScale().fitContent();
-    }
-  }, [tradeData, oraclePrice, oracleHistoryData]);
-
-  const noData = tradeData.length === 0 && oracleHistoryData.length < 2;
+  const noData = tradeData.length === 0 && oracleData.length < 2;
 
   return (
     <div className={styles.wrapper}>
+      {/* ── toolbar ── */}
       <div className={styles.toolbar}>
         <div className={styles.viewTabs}>
           <button className={view === 'price' ? styles.activeTab : ''} onClick={() => setView('price')}>Price</button>
@@ -315,33 +334,38 @@ export function TradeChart({ trades, oraclePrice, priceHistory, bids, asks, asse
         )}
       </div>
 
-      {view === 'price' ? (
-        <div className={styles.chartWrap}>
-          <div ref={containerRef} className={styles.chartContainer} />
-          {noData && (
-            <div className={styles.emptyOverlay}>
-              {oraclePrice > 0 ? (
-                <>
-                  <div className={styles.emptyOraclePrice}>
-                    ${oraclePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <div className={styles.emptyAsset}>{asset} / USD · Oracle Price</div>
-                  <div className={styles.emptyHint}>Place an order to begin the DEX price feed</div>
-                </>
-              ) : (
-                <>
-                  <div className={styles.emptyTitle}>No Price Data Yet</div>
-                  <div className={styles.emptyHint}>Connect wallet and refresh price to begin</div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className={styles.chartWrap}>
+      {/* ── chart area ── */}
+      <div className={styles.chartWrap}>
+        {view === 'price' ? (
+          <>
+            <div
+              ref={containerRef}
+              className={styles.chartContainer}
+              style={{ visibility: noData ? 'hidden' : 'visible' }}
+            />
+            {noData && (
+              <div className={styles.emptyOverlay}>
+                {oraclePrice > 0 ? (
+                  <>
+                    <div className={styles.emptyOraclePrice}>
+                      ${oraclePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <div className={styles.emptyAsset}>{asset} / USD · Oracle Reference</div>
+                    <div className={styles.emptyHint}>Place an order to start the DEX price feed</div>
+                  </>
+                ) : (
+                  <>
+                    <div className={styles.emptyTitle}>Waiting for price data</div>
+                    <div className={styles.emptyHint}>Connect wallet and tap a price in the header to refresh</div>
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
           <DepthCanvas bids={depthBids} asks={depthAsks} />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
