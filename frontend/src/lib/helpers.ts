@@ -12,16 +12,40 @@ export function toPair(v: any): [bigint, bigint] {
   return [0n, 0n];
 }
 
-/* Stable timestamp per trade ID — assigned once on first arrival, not re-stamped every poll */
-const tradeSeenAt = new Map<string, string>();
+/* Stable timestamp per trade ID — persisted to sessionStorage so page reloads don't reset them */
+const TS_KEY = 'thebookdex:trade-ts';
+
+function loadStoredTs(): Map<string, string> {
+  try {
+    const raw = sessionStorage.getItem(TS_KEY);
+    if (raw) return new Map(Object.entries(JSON.parse(raw)));
+  } catch {}
+  return new Map();
+}
+
+function saveTs(map: Map<string, string>) {
+  try {
+    if (map.size > 500) {
+      /* Keep only the 400 most recent entries */
+      const entries = [...map.entries()].slice(-400);
+      sessionStorage.setItem(TS_KEY, JSON.stringify(Object.fromEntries(entries)));
+    } else {
+      sessionStorage.setItem(TS_KEY, JSON.stringify(Object.fromEntries(map)));
+    }
+  } catch {}
+}
+
+const tradeSeenAt: Map<string, string> = loadStoredTs();
 
 export function toTradesArray(result: any): any[] {
-  if (!result) return [];
-  if (!Array.isArray(result)) return [];
-  if (tradeSeenAt.size > 1000) tradeSeenAt.clear();
-  return result.map((t: any) => {
+  if (!result || !Array.isArray(result)) return [];
+  let changed = false;
+  const out = result.map((t: any) => {
     const id = t?.[0]?.toString() || '0';
-    if (!tradeSeenAt.has(id)) tradeSeenAt.set(id, new Date().toLocaleTimeString());
+    if (!tradeSeenAt.has(id)) {
+      tradeSeenAt.set(id, new Date().toLocaleTimeString());
+      changed = true;
+    }
     return {
       id,
       price:  toBigInt(t?.[1]),
@@ -31,4 +55,6 @@ export function toTradesArray(result: any): any[] {
       time:   tradeSeenAt.get(id)!,
     };
   });
+  if (changed) saveTs(tradeSeenAt);
+  return out;
 }
