@@ -61,7 +61,7 @@ export function PoolsView() {
     const err = await executeTx(
       () => program!.amm.createPool(newA, newB),
       account,
-      () => { success('Pool created!'); setShowCreate(false); refreshAll(); }
+      () => { success('Pool created!'); setShowCreate(false); refreshAll(); setTimeout(() => refreshAll(), 2000); }
     );
     if (err) error(parseContractError(err));
   };
@@ -88,7 +88,7 @@ export function PoolsView() {
     const err = await executeTx(
       () => program!.amm.addLiquidity(poolId, bigA, bigB),
       account,
-      () => { success('Liquidity added!'); closeModal(); refreshAll(); }
+      () => { success('Liquidity added!'); closeModal(); refreshAll(); setTimeout(() => refreshAll(), 2000); }
     );
     if (err) error(parseContractError(err));
   };
@@ -102,7 +102,7 @@ export function PoolsView() {
     const err = await executeTx(
       () => program!.amm.removeLiquidity(poolId, bigLp),
       account,
-      () => { success('Liquidity removed!'); closeModal(); refreshAll(); }
+      () => { success('Liquidity removed!'); closeModal(); refreshAll(); setTimeout(() => refreshAll(), 2000); }
     );
     if (err) error(parseContractError(err));
   };

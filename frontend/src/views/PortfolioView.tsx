@@ -20,12 +20,15 @@ export function PortfolioView() {
   const { success, error, info } = useToast();
   const { txState, resetTx } = useTxStatus();
 
-  useEffect(() => {
+  const fetchOrders = useCallback(() => {
     if (!program || !isReady || !account) return;
-    program.orderbook.getMyOrders().withAddress(account.decodedAddress).call().then(result => {
+    program.orderbook.getMyOrders().withAddress(account.decodedAddress).call().then((result: any) => {
       if (result && Array.isArray(result)) setOrders(result);
     }).catch(console.error);
   }, [program, isReady, account]);
+
+  /* Refresh orders on mount and whenever portfolio changes (balance update = trade happened) */
+  useEffect(() => { fetchOrders(); }, [fetchOrders, portfolio]);
 
   const handleCancel = useCallback(async (oid: number | string | bigint) => {
     if (!program || !account) return;
@@ -40,13 +43,14 @@ export function PortfolioView() {
       setOrders(prev => prev.filter((o: any) => Number(o[0]) !== Number(oid)));
       refreshPortfolio();
       refreshAll();
+      setTimeout(() => { refreshPortfolio(); fetchOrders(); refreshAll(); }, 2000);
     } catch (e: any) {
       console.error('Cancel failed:', e);
       error(parseContractError(e?.message || String(e)));
     } finally {
       setCancelling(null);
     }
-  }, [program, account, success, error, refreshPortfolio]);
+  }, [program, account, success, error, refreshPortfolio, refreshAll, fetchOrders]);
 
   const handleDeposit = useCallback(() => {
     info('This is a demo DEX — balances are virtual. Click "Join DEX" to receive your free starting balance: $1,000 · 0.001 BTC · 0.01 ETH · 10 VARA.');

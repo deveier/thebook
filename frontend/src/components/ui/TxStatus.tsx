@@ -76,7 +76,15 @@ export function useTxStatus(): UseTxStatusReturn {
 
       updateStage('confirming');
       const { response } = await transaction.signAndSend();
-      await response();
+      const result = await response();
+
+      /* Contract returned Result<T, E> → { err: E } means the method failed */
+      if (result !== null && result !== undefined && typeof result === 'object' && 'err' in (result as object)) {
+        const errVal = (result as any).err;
+        const errMsg = typeof errVal === 'string' ? errVal : JSON.stringify(errVal);
+        updateStage('failed', errMsg);
+        return errMsg;
+      }
 
       updateStage('confirmed', 'Transaction confirmed successfully');
       onSuccess?.();

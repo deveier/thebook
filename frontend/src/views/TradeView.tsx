@@ -152,6 +152,8 @@ export function TradeView() {
         refreshPortfolio();
         refreshAll();
         success('Order placed successfully!');
+        /* Second refresh after 2s for RPC latency */
+        setTimeout(() => { refreshPortfolio(); refreshAll(); }, 2000);
       }
     );
 

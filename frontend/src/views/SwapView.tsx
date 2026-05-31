@@ -66,6 +66,7 @@ export function SwapView() {
         setAmountOut('');
         refreshAll();
         success('Swap executed!');
+        setTimeout(() => refreshAll(), 2000);
       }
     );
 

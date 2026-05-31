@@ -182,10 +182,13 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       const r = results[i];
       if (r.status === 'fulfilled') {
         const { asset, obResult, tradesResult } = r.value as { asset: Asset; obResult: any; tradesResult: any };
-        if (obResult && Array.isArray(obResult)) {
+        if (obResult != null) {
+          /* sails-js may return the tuple as array OR as keyed object {0:[...],1:[...]} */
+          const bidsRaw = Array.isArray(obResult) ? obResult[0] : (obResult as any)?.[0];
+          const asksRaw = Array.isArray(obResult) ? obResult[1] : (obResult as any)?.[1];
           newOrderbooks[asset] = {
-            bids: Array.from((obResult[0] as any) || []).map(toPair),
-            asks: Array.from((obResult[1] as any) || []).map(toPair),
+            bids: Array.from(bidsRaw || []).map(toPair),
+            asks: Array.from(asksRaw || []).map(toPair),
           };
         } else {
           newOrderbooks[asset] = { bids: [], asks: [] };
