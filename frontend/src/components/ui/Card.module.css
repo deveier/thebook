@@ -28,6 +28,8 @@
   min-height: 0;
   overflow: hidden;
   padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 767px) {

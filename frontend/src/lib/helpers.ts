@@ -12,15 +12,23 @@ export function toPair(v: any): [bigint, bigint] {
   return [0n, 0n];
 }
 
+/* Stable timestamp per trade ID — assigned once on first arrival, not re-stamped every poll */
+const tradeSeenAt = new Map<string, string>();
+
 export function toTradesArray(result: any): any[] {
   if (!result) return [];
-  if (Array.isArray(result)) return result.map((t: any) => ({
-    id: t?.[0]?.toString() || '0',
-    price: toBigInt(t?.[1]),
-    qty: toBigInt(t?.[2]),
-    buyer: t?.[3]?.toString?.() || '',
-    seller: t?.[4]?.toString?.() || '',
-    time: new Date().toLocaleTimeString(),
-  }));
-  return [];
+  if (!Array.isArray(result)) return [];
+  if (tradeSeenAt.size > 1000) tradeSeenAt.clear();
+  return result.map((t: any) => {
+    const id = t?.[0]?.toString() || '0';
+    if (!tradeSeenAt.has(id)) tradeSeenAt.set(id, new Date().toLocaleTimeString());
+    return {
+      id,
+      price:  toBigInt(t?.[1]),
+      qty:    toBigInt(t?.[2]),
+      buyer:  t?.[3]?.toString?.() || '',
+      seller: t?.[4]?.toString?.() || '',
+      time:   tradeSeenAt.get(id)!,
+    };
+  });
 }
