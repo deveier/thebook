@@ -83,8 +83,8 @@ export function PoolsView() {
     const b = parseFloat(amountB);
     if (isNaN(a) || a <= 0 || isNaN(b) || b <= 0) { error('Enter valid amounts'); return; }
     const poolId = managed.pool.id;
-    const bigA = BigInt(Math.round(a * 10**8));
-    const bigB = BigInt(Math.round(b * 10**8));
+    const bigA = BigInt(Math.round(a * 10**5));
+    const bigB = BigInt(Math.round(b * 10**5));
     const err = await executeTx(
       () => program!.amm.addLiquidity(poolId, bigA, bigB),
       account,
@@ -98,7 +98,7 @@ export function PoolsView() {
     const lp = parseFloat(lpAmount);
     if (isNaN(lp) || lp <= 0) { error('Enter a valid LP amount'); return; }
     const poolId = managed.pool.id;
-    const bigLp = BigInt(Math.round(lp * 10**8));
+    const bigLp = BigInt(Math.round(lp * 10**5));
     const err = await executeTx(
       () => program!.amm.removeLiquidity(poolId, bigLp),
       account,
@@ -108,7 +108,7 @@ export function PoolsView() {
   };
 
   const fmt = (val: bigint | number | string) =>
-    (Number(val) / 10**8).toLocaleString(undefined, { maximumFractionDigits: 6 });
+    (Number(val) / 10**5).toLocaleString(undefined, { maximumFractionDigits: 6 });
 
   const isBusy = txState.visible && txState.stage !== 'failed' && txState.stage !== 'confirmed';
 
@@ -281,13 +281,13 @@ export function PoolsView() {
                     onChange={e => setLpAmount(e.target.value)}
                     placeholder="0.00000000"
                     min="0"
-                    max={(managed.myLp / 10**8).toString()}
+                    max={(managed.myLp / 10**5).toString()}
                   />
                 </div>
                 <button
                   className={styles.btnSecondary}
                   style={{ fontSize: 12, padding: '4px 8px', marginTop: -8 }}
-                  onClick={() => setLpAmount((managed.myLp / 10**8).toString())}
+                  onClick={() => setLpAmount((managed.myLp / 10**5).toString())}
                 >
                   Max
                 </button>

@@ -53,7 +53,7 @@ export function PortfolioView() {
   }, [program, account, success, error, refreshPortfolio, refreshAll, fetchOrders]);
 
   const handleDeposit = useCallback(() => {
-    info('This is a demo DEX — balances are virtual. Click "Join DEX" to receive your free starting balance: $1,000 · 0.001 BTC · 0.01 ETH · 10 VARA.');
+    info('This is a demo DEX — balances are virtual. Click "Join DEX" to receive your free starting balance: $1,000 · 1 BTC · 10 ETH · 10,000 VARA.');
   }, [info]);
 
   const handleWithdraw = useCallback(() => {
@@ -86,9 +86,9 @@ export function PortfolioView() {
 
   const assets = [
     { name: 'USD',  amount: portfolio.usd,  decimals: 2 },
-    { name: 'BTC',  amount: portfolio.btc,  decimals: 8 },
-    { name: 'ETH',  amount: portfolio.eth,  decimals: 8 },
-    { name: 'VARA', amount: portfolio.vara, decimals: 8 },
+    { name: 'BTC',  amount: portfolio.btc,  decimals: 5 },
+    { name: 'ETH',  amount: portfolio.eth,  decimals: 5 },
+    { name: 'VARA', amount: portfolio.vara, decimals: 5 },
   ];
 
   return (

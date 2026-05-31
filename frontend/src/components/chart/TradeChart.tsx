@@ -188,8 +188,8 @@ export function TradeChart({ trades, oraclePrice, priceHistory, bids, asks, asse
     const now = Math.floor(Date.now() / 1000);
     return t.map((trade, i) => ({
       time: (now - (t.length - i) * INTERVAL_SEC) as UTCTimestamp,
-      value: Number(trade.price) / 100,
-      volume: Number(trade.qty) / 10**8,
+      value: Number(trade.price) * 1000,
+      volume: Number(trade.qty) / 10**5,
     }));
   }, [trades, timeframe]);
 
@@ -197,8 +197,8 @@ export function TradeChart({ trades, oraclePrice, priceHistory, bids, asks, asse
     const out: { price: number; cum: number }[] = [];
     let sum = 0;
     for (const [p, q] of bids) {
-      sum += Number(q) / 10**8;
-      out.push({ price: Number(p) / 100, cum: sum });
+      sum += Number(q) / 10**5;
+      out.push({ price: Number(p) * 1000, cum: sum });
     }
     return out;
   }, [bids]);
@@ -207,8 +207,8 @@ export function TradeChart({ trades, oraclePrice, priceHistory, bids, asks, asse
     const out: { price: number; cum: number }[] = [];
     let sum = 0;
     for (const [p, q] of asks) {
-      sum += Number(q) / 10**8;
-      out.push({ price: Number(p) / 100, cum: sum });
+      sum += Number(q) / 10**5;
+      out.push({ price: Number(p) * 1000, cum: sum });
     }
     return out;
   }, [asks]);

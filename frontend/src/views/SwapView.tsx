@@ -31,7 +31,7 @@ export function SwapView() {
     if (!activePool || !inAmount) { setAmountOut(''); return; }
     const parsed = parseFloat(inAmount);
     if (isNaN(parsed) || parsed <= 0) { setAmountOut(''); return; }
-    const amount = BigInt(Math.round(parsed * 10**8));
+    const amount = BigInt(Math.round(parsed * 10**5));
 
     const fee = 997n;
     const feeDenom = 1000n;
@@ -41,7 +41,7 @@ export function SwapView() {
     const numerator = amountInWithFee * reserveOut;
     const denominator = reserveIn * feeDenom + amountInWithFee;
     const out = numerator / denominator;
-    setAmountOut((Number(out) / 10**8).toFixed(6));
+    setAmountOut((Number(out) / 10**5).toFixed(5));
   }, [activePool, fromAsset]);
 
   const handleSwap = async () => {
@@ -54,8 +54,8 @@ export function SwapView() {
     const parsedOut = parseFloat(amountOut);
     if (isNaN(parsedIn) || parsedIn <= 0) return;
     const slippageMultiplier = (100 - slippage) / 100;
-    const minOutValue = isNaN(parsedOut) || parsedOut <= 0 ? 0n : BigInt(Math.round(parsedOut * 10**8 * slippageMultiplier));
-    const inAmount = BigInt(Math.round(parsedIn * 10**8));
+    const minOutValue = isNaN(parsedOut) || parsedOut <= 0 ? 0n : BigInt(Math.round(parsedOut * 10**5 * slippageMultiplier));
+    const inAmount = BigInt(Math.round(parsedIn * 10**5));
     const minOut = minOutValue;
 
     const err = await executeTx(
@@ -132,7 +132,7 @@ export function SwapView() {
             <div className={styles.priceInfo}>
               <div className={styles.infoRow}>
                 <span>Pool Reserves</span>
-                <span>{activePool.asset_a}: {Number(activePool.reserve_a) / 10**8} / {activePool.asset_b}: {Number(activePool.reserve_b) / 10**8}</span>
+                <span>{activePool.asset_a}: {Number(activePool.reserve_a) / 10**5} / {activePool.asset_b}: {Number(activePool.reserve_b) / 10**5}</span>
               </div>
             </div>
           )}
@@ -162,7 +162,7 @@ export function SwapView() {
             {pools.map(p => (
               <div key={p.id.toString()} className={styles.infoRow} style={{ padding: '8px 16px' }}>
                 <span>{p.asset_a} / {p.asset_b}</span>
-                <span>TVL: ${(Number(p.reserve_a) + Number(p.reserve_b)) / 10**8}</span>
+                <span>TVL: ${(Number(p.reserve_a) + Number(p.reserve_b)) / 10**5}</span>
               </div>
             ))}
           </Card>

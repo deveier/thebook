@@ -61,10 +61,9 @@ export function TradeView() {
   const lastPrice = tradesList.length > 0 ? tradesList[0].price : 0n;
 
   const priceDiff = useMemo(() => {
-    const lp = Number(lastPrice) / 100;
+    const lp = Number(lastPrice) * 1000;
     if (!lp || !oraclePrice) return null;
-    const diff = (lp - oraclePrice) / oraclePrice * 100;
-    return diff;
+    return (lp - oraclePrice) / oraclePrice * 100;
   }, [lastPrice, oraclePrice]);
 
   const maxQty = useMemo(() => {
@@ -80,8 +79,8 @@ export function TradeView() {
     if (!portfolio) return { value: 0n, label: '$0.00', decimals: 2 };
     if (orderType === 'Market' || side === 'Sell') {
       const amt = asset === 'BTC' ? portfolio.btc : asset === 'ETH' ? portfolio.eth : portfolio.vara;
-      const formatted = (Number(amt) / 10**8).toLocaleString(undefined, { maximumFractionDigits: 8 });
-      return { value: amt, label: formatted, decimals: 8 };
+      const formatted = (Number(amt) / 10**5).toLocaleString(undefined, { maximumFractionDigits: 5 });
+      return { value: amt, label: formatted, decimals: 5 };
     }
     return { value: portfolio.usd, label: `$${(Number(portfolio.usd) / 100).toLocaleString()}`, decimals: 2 };
   }, [portfolio, side, orderType, asset]);
@@ -108,9 +107,9 @@ export function TradeView() {
   };
 
   function minDecimals(n: number): number {
-    if (n >= 1) return 4;
-    if (n >= 0.01) return 6;
-    return 8;
+    if (n >= 1) return 3;
+    if (n >= 0.01) return 4;
+    return 5;
   }
 
   const handlePlaceOrder = async () => {
@@ -132,7 +131,7 @@ export function TradeView() {
       }
     }
 
-    const q = BigInt(Math.round(parsedQty * 10**8));
+    const q = BigInt(Math.round(parsedQty * 10**5));
 
     const err = await executeTx(
       () => {
@@ -142,7 +141,8 @@ export function TradeView() {
           }
           return program!.orderbook.marketSell(asset, q);
         }
-        const p = BigInt(Math.round(parseFloat(price) * 100));
+        /* price: USD / 1000 → contract units (10^5 qty scale makes cost = price*qty in cents) */
+        const p = BigInt(Math.max(1, Math.round(parseFloat(price) / 1000)));
         return program!.orderbook.placeLimit(side, asset, p, q);
       },
       account,
@@ -217,7 +217,7 @@ export function TradeView() {
             <div className={styles.statItem}>
                 <span className={styles.statLabel}>DEX Price</span>
                 <span className={styles.statValue}>
-                  ${lastPrice ? (Number(lastPrice)/100).toFixed(2) : '---'}
+                  ${lastPrice ? (Number(lastPrice)*1000).toFixed(2) : '---'}
                 </span>
             </div>
             <div className={styles.statItem}>
@@ -270,29 +270,29 @@ export function TradeView() {
         {orderbook.asks.slice(0, 10).reverse().map(([p, q], i) => (
           <div key={i} className={`${styles.obRow} ${styles.ask}`}
             style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
-            onClick={() => setPrice((Number(p)/100).toString())}
+            onClick={() => setPrice((Number(p)*1000).toString())}
             role="button" tabIndex={0}
-            onKeyDown={e => handleObKeyDown(e, (Number(p)/100).toString())}
-            aria-label={`Ask price ${(Number(p)/100).toFixed(2)}, quantity ${(Number(q)/10**8).toFixed(4)}`}>
-            <span>{(Number(p)/100).toFixed(2)}</span>
-            <span>{(Number(q)/10**8).toFixed(4)}</span>
-            <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
+            onKeyDown={e => handleObKeyDown(e, (Number(p)*1000).toString())}
+            aria-label={`Ask price ${(Number(p)*1000).toFixed(2)}, quantity ${(Number(q)/10**5).toFixed(5)}`}>
+            <span>{(Number(p)*1000).toFixed(2)}</span>
+            <span>{(Number(q)/10**5).toFixed(5)}</span>
+            <span>{((Number(p)*Number(q))/100).toFixed(2)}</span>
           </div>
         ))}
         <div className={styles.spread}>
-          <span className={styles.lastPrice}>{lastPrice ? (Number(lastPrice)/100).toFixed(2) : '---'}</span>
+          <span className={styles.lastPrice}>{lastPrice ? (Number(lastPrice)*1000).toFixed(2) : '---'}</span>
           <span className={styles.spreadLabel}>Last Price</span>
         </div>
         {orderbook.bids.slice(0, 10).map(([p, q], i) => (
           <div key={i} className={`${styles.obRow} ${styles.bid}`}
             style={{ '--depth': maxQty > 0n ? `${(Number(q) / Number(maxQty) * 100).toFixed(1)}%` : '0%' } as React.CSSProperties}
-            onClick={() => setPrice((Number(p)/100).toString())}
+            onClick={() => setPrice((Number(p)*1000).toString())}
             role="button" tabIndex={0}
-            onKeyDown={e => handleObKeyDown(e, (Number(p)/100).toString())}
-            aria-label={`Bid price ${(Number(p)/100).toFixed(2)}, quantity ${(Number(q)/10**8).toFixed(4)}`}>
-            <span>{(Number(p)/100).toFixed(2)}</span>
-            <span>{(Number(q)/10**8).toFixed(4)}</span>
-            <span>{((Number(p)*Number(q))/10**10).toFixed(2)}</span>
+            onKeyDown={e => handleObKeyDown(e, (Number(p)*1000).toString())}
+            aria-label={`Bid price ${(Number(p)*1000).toFixed(2)}, quantity ${(Number(q)/10**5).toFixed(5)}`}>
+            <span>{(Number(p)*1000).toFixed(2)}</span>
+            <span>{(Number(q)/10**5).toFixed(5)}</span>
+            <span>{((Number(p)*Number(q))/100).toFixed(2)}</span>
           </div>
         ))}
       </div>
@@ -397,8 +397,8 @@ export function TradeView() {
         )}
         {tradesList.map((t, i) => (
           <div key={i} className={styles.obRow}>
-            <span className={styles.buyText}>{(Number(t.price)/100).toFixed(2)}</span>
-            <span>{(Number(t.qty)/10**8).toFixed(4)}</span>
+            <span className={styles.buyText}>{(Number(t.price)*1000).toFixed(2)}</span>
+            <span>{(Number(t.qty)/10**5).toFixed(5)}</span>
             <span>{t.time}</span>
           </div>
         ))}
