@@ -74,7 +74,7 @@
 
 .step.active {
   color: var(--primary);
-  background: rgba(240, 185, 11, 0.1);
+  background: rgba(0, 178, 114, 0.1);
 }
 
 .step.pending {

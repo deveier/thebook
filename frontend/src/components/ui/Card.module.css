@@ -9,7 +9,7 @@
 }
 
 .card:hover {
-  border-color: rgba(240, 185, 11, 0.15);
+  border-color: rgba(0, 178, 114, 0.15);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 

@@ -250,6 +250,7 @@ export function TradeView() {
         asks={orderbook.asks}
         asset={asset}
       />
+      {/* trades/priceHistory passed for future DEX overlay — chart uses Binance/CoinGecko for main candles */}
     </Card>
   );
 
