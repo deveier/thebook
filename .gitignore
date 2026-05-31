@@ -21,3 +21,4 @@ thebook-v5.wasm
 .binpath
 node_modules/
 scripts/
+.github/workflows/
