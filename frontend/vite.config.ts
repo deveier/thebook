@@ -73,6 +73,16 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 800,
   },
+  server: {
+    proxy: {
+      /* Forward /api/* to Vercel dev server when running `vercel dev` locally */
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   resolve: {
     dedupe: ['react', 'react-dom', '@polkadot/util', '@polkadot/util-crypto', '@polkadot/api', '@polkadot/types'],
   },

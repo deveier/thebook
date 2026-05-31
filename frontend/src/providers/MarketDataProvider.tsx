@@ -30,6 +30,7 @@ interface MarketContextValue {
   pricesStale: boolean;
   pricesLoading: boolean;
   fetchPrices: () => Promise<void>;
+  refreshAll: () => void;
 }
 
 /* ── Helpers ── */
@@ -75,6 +76,7 @@ const MarketContext = createContext<MarketContextValue>({
   pricesStale: false,
   pricesLoading: false,
   fetchPrices: async () => {},
+  refreshAll: () => {},
 });
 
 export function useMarketData() {
@@ -82,6 +84,8 @@ export function useMarketData() {
 }
 
 /* ── Provider ── */
+
+const POLL_MS = 5_000;
 
 export function MarketDataProvider({ children }: { children: ReactNode }) {
   const { account } = useAccount();
@@ -96,6 +100,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
   const [pricesLoading, setPricesLoading] = useState(false);
   const fetchingRef = useRef(false);
   const initLoadedRef = useRef(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const pricesStale = lastFetched !== null && Date.now() - lastFetched > STALE_MS;
 
@@ -109,73 +114,77 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  /* Fetch public data: orderbook + trades + pools + leaderboard */
+  /* Core data fetch: orderbook + trades + pools + leaderboard */
+  const fetchAll = useCallback(async (programRef: typeof program) => {
+    if (!programRef) return;
+    const results = await Promise.allSettled([
+      ...ASSETS.map(async (asset) => {
+        const [obResult, tradesResult] = await Promise.all([
+          programRef.orderbook.getOrderbook(asset).call().catch(() => null),
+          programRef.orderbook.getTrades(asset, 20).call().catch(() => null),
+        ]);
+        return { asset, obResult, tradesResult };
+      }),
+      programRef.amm.listPools().call().catch(() => []),
+      programRef.orderbook.getLeaderboard(10).call().catch(() => []),
+    ]);
+
+    const newOrderbooks: Record<string, OrderbookData> = {};
+    const newTrades: Record<string, any[]> = {};
+
+    for (let i = 0; i < ASSETS.length; i++) {
+      const r = results[i];
+      if (r.status === 'fulfilled') {
+        const { asset, obResult, tradesResult } = r.value as { asset: Asset; obResult: any; tradesResult: any };
+        if (obResult && Array.isArray(obResult)) {
+          newOrderbooks[asset] = {
+            bids: Array.from((obResult[0] as any) || []).map(toPair),
+            asks: Array.from((obResult[1] as any) || []).map(toPair),
+          };
+        } else {
+          newOrderbooks[asset] = { bids: [], asks: [] };
+        }
+        newTrades[asset] = toTradesArray(tradesResult);
+      } else {
+        newOrderbooks[ASSETS[i]] = { bids: [], asks: [] };
+        newTrades[ASSETS[i]] = [];
+      }
+    }
+
+    setOrderbooks(newOrderbooks);
+    setTrades(newTrades);
+
+    const poolsResult = results[3];
+    if (poolsResult.status === 'fulfilled') setPools(poolsResult.value as Pool[]);
+
+    const leadersResult = results[4];
+    if (leadersResult.status === 'fulfilled') setLeaders(leadersResult.value as LeaderEntry[]);
+  }, []);
+
+  /* Initial load + 5s polling */
   useEffect(() => {
     if (!program) return;
 
-    let cancelled = false;
+    let active = true;
 
-    const fetchAll = async () => {
+    const run = async () => {
       setLoading(true);
-
-      const results = await Promise.allSettled([
-        ...ASSETS.map(async (asset) => {
-          const [obResult, tradesResult] = await Promise.all([
-            program.orderbook.getOrderbook(asset).call().catch(() => null),
-            program.orderbook.getTrades(asset, 20).call().catch(() => null),
-          ]);
-          return { asset, obResult, tradesResult };
-        }),
-        program.amm.listPools().call().catch(() => []),
-        program.orderbook.getLeaderboard(10).call().catch(() => []),
-      ]);
-
-      if (cancelled) return;
-
-      const newOrderbooks: Record<string, OrderbookData> = {};
-      const newTrades: Record<string, any[]> = {};
-
-      for (let i = 0; i < ASSETS.length; i++) {
-        const r = results[i];
-        if (r.status === 'fulfilled') {
-          const { asset, obResult, tradesResult } = r.value as { asset: Asset; obResult: any; tradesResult: any };
-          if (obResult && Array.isArray(obResult)) {
-            const bidsRaw: any[] = obResult[0] as any;
-            const asksRaw: any[] = obResult[1] as any;
-            newOrderbooks[asset] = {
-              bids: Array.from(bidsRaw || []).map(toPair),
-              asks: Array.from(asksRaw || []).map(toPair),
-            };
-          } else {
-            newOrderbooks[asset] = { bids: [], asks: [] };
-          }
-          newTrades[asset] = toTradesArray(tradesResult);
-        } else {
-          newOrderbooks[ASSETS[i]] = { bids: [], asks: [] };
-          newTrades[ASSETS[i]] = [];
-        }
-      }
-
-      setOrderbooks(newOrderbooks);
-      setTrades(newTrades);
-
-      const poolsResult = results[3];
-      if (poolsResult.status === 'fulfilled') {
-        setPools(poolsResult.value as Pool[]);
-      }
-
-      const leadersResult = results[4];
-      if (leadersResult.status === 'fulfilled') {
-        setLeaders(leadersResult.value as LeaderEntry[]);
-      }
-
-      setLoading(false);
+      await fetchAll(program);
+      if (active) setLoading(false);
     };
 
-    fetchAll();
+    run();
 
-    return () => { cancelled = true; };
-  }, [program]);
+    pollRef.current = setInterval(() => { if (active) fetchAll(program); }, POLL_MS);
+
+    return () => {
+      active = false;
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [program, fetchAll]);
+
+  /* refreshAll: call after any transaction to immediately sync state */
+  const refreshAll = useCallback(() => { fetchAll(program); }, [fetchAll, program]);
 
   /* Fetch oracle prices (needs wallet — only call from user gesture, not from effects/interval) */
   const fetchPrices = useCallback(async () => {
@@ -204,9 +213,14 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
 
       if (changed) {
         const ts = Date.now();
-        setPrices(newPrices);
+        /* Merge: don't let failed fetches (null) overwrite existing prices */
+        const merged = { ...prices };
+        for (const asset of ASSETS) {
+          if (newPrices[asset] !== null) merged[asset] = newPrices[asset];
+        }
+        setPrices(merged);
         setLastFetched(ts);
-        saveSharedPrices(newPrices, ts);
+        saveSharedPrices(merged, ts);
       }
     } finally {
       fetchingRef.current = false;
@@ -226,6 +240,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       pricesStale,
       pricesLoading,
       fetchPrices,
+      refreshAll,
     }}>
       {children}
     </MarketContext.Provider>

@@ -1,6 +1,7 @@
 import { Card } from '../components/ui/Card';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { useSails } from '../hooks/useSails';
+import { useMarketData } from '../providers/MarketDataProvider';
 import styles from './PortfolioView.module.css';
 import { useState, useEffect, useCallback } from 'react';
 import { web3FromSource } from '@polkadot/extension-dapp';
@@ -13,17 +14,18 @@ import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 export function PortfolioView() {
   const { portfolio, loading, join, refresh: refreshPortfolio } = usePortfolio();
   const { program, account, isReady } = useSails();
+  const { refreshAll } = useMarketData();
   const [orders, setOrders] = useState<any[]>([]);
   const [cancelling, setCancelling] = useState<number | null>(null);
   const { success, error, info } = useToast();
   const { txState, resetTx } = useTxStatus();
 
   useEffect(() => {
-    if (!program || !isReady) return;
-    program.orderbook.getMyOrders().call().then(result => {
+    if (!program || !isReady || !account) return;
+    program.orderbook.getMyOrders().withAddress(account.address).call().then(result => {
       if (result && Array.isArray(result)) setOrders(result);
     }).catch(console.error);
-  }, [program, isReady]);
+  }, [program, isReady, account]);
 
   const handleCancel = useCallback(async (oid: number | string | bigint) => {
     if (!program || !account) return;
@@ -37,6 +39,7 @@ export function PortfolioView() {
       success('Order cancelled');
       setOrders(prev => prev.filter((o: any) => Number(o[0]) !== Number(oid)));
       refreshPortfolio();
+      refreshAll();
     } catch (e: any) {
       console.error('Cancel failed:', e);
       error(parseContractError(e?.message || String(e)));
@@ -46,11 +49,11 @@ export function PortfolioView() {
   }, [program, account, success, error, refreshPortfolio]);
 
   const handleDeposit = useCallback(() => {
-    info('Deposit functionality coming soon. Use Vara Network wallet transfer to deposit funds.');
+    info('This is a demo DEX — balances are virtual. Click "Join DEX" to receive your free starting balance: $1,000 · 0.001 BTC · 0.01 ETH · 10 VARA.');
   }, [info]);
 
   const handleWithdraw = useCallback(() => {
-    info('Withdraw functionality coming soon.');
+    info('This is a demo DEX — balances are virtual. Trade, swap, and provide liquidity to grow your portfolio!');
   }, [info]);
 
   const formatAmount = (val: bigint | number | string, decimals: number = 2) => {

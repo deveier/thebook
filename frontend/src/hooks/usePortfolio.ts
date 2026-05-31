@@ -18,9 +18,7 @@ export function usePortfolio() {
     if (!program || !account) return;
 
     try {
-      console.log('Fetching portfolio for:', account.address);
-      const result = await program.orderbook.getPortfolio().call();
-      console.log('Portfolio result:', result);
+      const result = await program.orderbook.getPortfolio().withAddress(account.address).call();
 
       if (result && Array.isArray(result)) {
         setPortfolio({

@@ -45,7 +45,7 @@ export function TradeView() {
   const [mobilePanel, setMobilePanel] = useState<PanelId>('chart');
   const { isMobile } = useViewport();
 
-  const { prices, orderbooks, trades, loading: marketLoading, lastFetched, pricesStale, pricesLoading, fetchPrices } = useMarketData();
+  const { prices, orderbooks, trades, loading: marketLoading, lastFetched, pricesStale, pricesLoading, fetchPrices, refreshAll } = useMarketData();
   const { portfolio, refresh: refreshPortfolio } = usePortfolio();
   const { program, account } = useSails();
   const { success, error } = useToast();
@@ -150,6 +150,7 @@ export function TradeView() {
         setPrice('');
         setQty('');
         refreshPortfolio();
+        refreshAll();
         success('Order placed successfully!');
       }
     );
@@ -313,24 +314,22 @@ export function TradeView() {
           Market
         </button>
       </div>
-      {orderType === 'Limit' && (
-        <div className={styles.sideButtons}>
-          <button
-            className={`${styles.buyBtn} ${side === 'Buy' ? '' : styles.inactive}`}
-            onClick={() => setSide('Buy')}
-            aria-pressed={side === 'Buy'}
-          >
-            Buy
-          </button>
-          <button
-            className={`${styles.sellBtn} ${side === 'Sell' ? '' : styles.inactive}`}
-            onClick={() => setSide('Sell')}
-            aria-pressed={side === 'Sell'}
-          >
-            Sell
-          </button>
-        </div>
-      )}
+      <div className={styles.sideButtons}>
+        <button
+          className={`${styles.buyBtn} ${side === 'Buy' ? '' : styles.inactive}`}
+          onClick={() => setSide('Buy')}
+          aria-pressed={side === 'Buy'}
+        >
+          Buy
+        </button>
+        <button
+          className={`${styles.sellBtn} ${side === 'Sell' ? '' : styles.inactive}`}
+          onClick={() => setSide('Sell')}
+          aria-pressed={side === 'Sell'}
+        >
+          Sell
+        </button>
+      </div>
       {orderType === 'Limit' && (
         <div className={styles.formGroup}>
           <label>Price (USD)</label>

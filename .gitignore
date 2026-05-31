@@ -19,4 +19,5 @@ thebook-v41.wasm
 thebook-v5.idl
 thebook-v5.wasm
 .binpath
-.github/workflows/
+node_modules/
+scripts/

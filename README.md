@@ -1,27 +1,137 @@
-## The **test-sails** program
+# thebookdex
 
-[![Build Status](https://github.com/gear-tech/test-sails/workflows/CI/badge.svg)](https://github.com/gear-tech/test-sails/actions)
+**On-chain DEX on Vara Network** — Central Limit Orderbook + AMM Liquidity Pools.
 
-Program **test-sails** for [⚙️ Gear Protocol](https://github.com/gear-tech/gear) written in [⛵ Sails](https://github.com/gear-tech/sails) framework.
+[![Build Status](https://github.com/deveier/thebook/actions/workflows/ci.yml/badge.svg)](https://github.com/deveier/thebook/actions)
+[![Live Demo](https://img.shields.io/badge/demo-thebookdex.vercel.app-blue)](https://thebookdex.vercel.app)
+[![Program ID](https://img.shields.io/badge/Vara-mainnet-green)](https://idea.gear-tech.io/programs/0x7fa1988c57ba1134e2461c5fb36bc13d66c1dfbf47d36c5e9960b9ca2dc0e4c4)
 
-The program workspace includes the following packages:
-- `test-sails` is the package allowing to build WASM binary for the program and IDL file for it.
-  The package also includes integration tests for the program in the `tests` sub-folder
-- `test-sails-app` is the package containing business logic for the program represented by the `TestSails` structure.
-- `test-sails-client` is the package containing the client for the program allowing to interact with it from another program, tests, or off-chain client.
+**Track:** Economy & Markets | **Hackathon:** [Vara A2A Season 1](https://agents.vara.network)
 
-### 🏗️ Building
+---
 
-```bash
-cargo build --release
+## What it does
+
+thebookdex is a fully on-chain decentralized exchange running on the Vara Network. It combines two trading models in a single Sails program:
+
+**A) Central Limit Orderbook** — Exchange-style trading
+- Place limit buy/sell orders at a specific price
+- Execute market orders against the best available price
+- Supports BTC, ETH, VARA — all quoted in USD
+- Automatic on-chain order matching
+
+**B) Automated Market Maker (AMM)** — Uniswap-style liquidity pools
+- Create liquidity pools for any asset pair
+- Add/remove liquidity as an LP provider
+- Swap tokens with 0.3% fee using constant product (x·y=k) formula
+- Earn fees proportional to LP share
+
+**Oracle integration** — Live prices fetched from the [VaraBridge](https://github.com/Oltking/vara-trinity) oracle via cross-program call. Arbitrage opportunities between DEX price and oracle price are displayed in real time.
+
+**Agent-to-agent interface** — Other Sails programs can call `CallAgentService` to route messages through thebookdex, making it composable in multi-agent pipelines. See [skills.md](./skills.md) for the full integration guide.
+
+---
+
+## Program ID
+
+```
+0x7fa1988c57ba1134e2461c5fb36bc13d66c1dfbf47d36c5e9960b9ca2dc0e4c4
 ```
 
-### ✅ Testing
+Live on Vara mainnet. View on [IDEA](https://idea.gear-tech.io/programs/0x7fa1988c57ba1134e2461c5fb36bc13d66c1dfbf47d36c5e9960b9ca2dc0e4c4).
 
-```bash
-cargo test --release
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Smart contract | Rust · Sails RS v0.10.4 · WASM |
+| Blockchain | Vara Network (wss://rpc.vara.network) |
+| Frontend | React 18 · TypeScript · Vite 5 |
+| Web3 | @gear-js/api · sails-js · Polkadot.js |
+| Styling | CSS Modules · PWA (vite-plugin-pwa) |
+| Deployment | Vercel |
+
+---
+
+## Contract architecture
+
+```
+Program (thebook)
+  ├── OrderbookService (orderbook.rs)
+  │     Join · PlaceLimit · MarketBuy · MarketSell · CancelOrder
+  │     GetOrderbook · GetPortfolio · GetTrades · GetLeaderboard
+  │     GetLivePrice (→ VaraBridge cross-program) · CallAgentService
+  │
+  └── AmmService (amm.rs)
+        CreatePool · AddLiquidity · RemoveLiquidity · Swap
+        ListPools · GetPool · GetLpPosition
 ```
 
-# License
+Shared state: `DexState` (state.rs) — balances, orders, pools, trades, LP positions in a single `RefCell<DexState>`.
 
-The source code is licensed under the [MIT license](LICENSE).
+---
+
+## Agent-to-agent integration
+
+Any Sails program on Vara can call thebookdex directly. See [skills.md](./skills.md) for the full interface documentation including payload encoding, call patterns, and example Rust code.
+
+Quick example — place a market buy from another program:
+
+```rust
+let mut payload = "Orderbook".encode();
+payload.extend("MarketBuy".encode());
+payload.extend((Asset::BTC, 100_000u64).encode()); // buy 0.001 BTC
+
+msg::send_for_reply_as::<RawPayload, SailsReply<Result<String, ContractError>>>(
+    THEBOOKDEX_PID, RawPayload(payload), gas, 0,
+)?.await?.0
+```
+
+---
+
+## Frontend
+
+Five views, fully responsive (mobile · tablet · desktop):
+
+| View | Description |
+|---|---|
+| **Trade** | 4-panel trading terminal: chart · orderbook · order entry · recent trades |
+| **Swap** | AMM swap with real-time constant-product output calculation |
+| **Pools** | Create pools, add/remove liquidity, view LP positions |
+| **Portfolio** | Balances, net worth, open orders with cancel |
+| **Leaderboard** | Top traders ranked by net worth |
+
+---
+
+## Building & testing
+
+```bash
+# Smart contract
+cargo build --release          # builds WASM binary
+cargo test --release           # runs all gtest integration tests
+
+# Frontend
+cd frontend
+npm install
+npm run dev                    # development server (localhost:5173)
+npm run build                  # TypeScript check + production build
+```
+
+---
+
+## Deployment
+
+The frontend is deployed to Vercel. To deploy your own instance:
+
+1. Fork this repo
+2. Update `frontend/src/consts.ts` with your program ID
+3. Connect the `frontend/` folder to Vercel
+4. Optionally add a Vercel KV store for shared oracle price caching
+
+---
+
+## License
+
+MIT
