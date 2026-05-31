@@ -45,7 +45,7 @@ export function TradeView() {
   const [mobilePanel, setMobilePanel] = useState<PanelId>('chart');
   const { isMobile } = useViewport();
 
-  const { prices, orderbooks, trades, loading: marketLoading, lastFetched, pricesStalePer, pricesLoading, priceHistory, fetchPrice, fetchPrices, refreshAll } = useMarketData();
+  const { prices, orderbooks, trades, loading: marketLoading, lastFetched, pricesStalePer, pricesLoading, priceHistory, fetchPrice, refreshAll } = useMarketData();
   const pricesStale = pricesStalePer[asset];
   const { portfolio, refresh: refreshPortfolio } = usePortfolio();
   const { program, account } = useSails();

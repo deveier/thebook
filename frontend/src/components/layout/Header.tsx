@@ -16,20 +16,13 @@ interface HeaderProps {
   onMenuClick: () => void;
 }
 
-function fmtTimeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  const m = Math.floor(diff / 60000);
-  const s = Math.floor((diff % 60000) / 1000);
-  if (m >= 1) return `${m}m ${s}s ago`;
-  return `${s}s ago`;
-}
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { account, login, logout } = useAccount();
   const { portfolio, join, loading } = usePortfolio();
   const { error } = useToast();
   const { isMobile } = useViewport();
-  const { prices, lastFetched, pricesStale, pricesStalePer, pricesLoading, fetchPrices, fetchPrice } = useMarketData();
+  const { prices, lastFetched, pricesStalePer, pricesLoading, fetchPrices, fetchPrice } = useMarketData();
   const [showAccountSelector, setShowAccountSelector] = useState(false);
   const joinedRef = useRef(false);
 
