@@ -48,8 +48,9 @@ export function TradeView({ mode = 'spot' }: TradeViewProps) {
 
   const { prices, orderbooks, trades, loading: marketLoading, pricesStalePer, pricesLoading, priceHistory, fetchPrice, refreshAll, tickMarket, tickLoading } = useMarketData();
   const { portfolio, refresh: refreshPortfolio } = usePortfolio();
-  const { positions, addPosition, removePosition, unrealizedPnl, liqPrice } = usePositions();
   const { program, account } = useSails();
+  /* Positions scoped to the connected wallet address */
+  const { positions, addPosition, removePosition, unrealizedPnl, liqPrice } = usePositions(account?.decodedAddress);
   const { success, error } = useToast();
   const { txState, executeTx, resetTx } = useTxStatus();
 
@@ -78,17 +79,21 @@ export function TradeView({ mode = 'spot' }: TradeViewProps) {
     return isNaN(p) || p <= 0 ? markPrice : p;
   }, [orderType, price, markPrice]);
 
-  const notional = useMemo(() => {
+  /* Actual USD to spend — what the contract deducts from balance */
+  const actualCost = useMemo(() => {
     const a = parseFloat(usdAmount);
-    return isNaN(a) || a <= 0 ? 0 : a * leverage;
-  }, [usdAmount, leverage]);
+    return isNaN(a) || a <= 0 ? 0 : a;
+  }, [usdAmount]);
 
-  const assetQty = entryPrice > 0 ? notional / entryPrice : 0;
+  /* Leverage only scales how the position is labelled and the liq price — not the real cost */
+  const displayNotional = actualCost * leverage;
+
+  const assetQty = entryPrice > 0 ? actualCost / entryPrice : 0;
   const contractQty = BigInt(Math.round(assetQty * 1e5));
   const contractPrice = BigInt(Math.max(1, Math.round(entryPrice / 1000)));
 
   const estimatedLiqPrice = useMemo(() => {
-    if (!entryPrice || !leverage) return 0;
+    if (!entryPrice || leverage <= 1) return 0;
     const m = 0.9 / leverage;
     return direction === 'Long' ? entryPrice * (1 - m) : entryPrice * (1 + m);
   }, [entryPrice, leverage, direction]);
@@ -201,13 +206,20 @@ export function TradeView({ mode = 'spot' }: TradeViewProps) {
       return;
     }
 
-    const margin = parseFloat(usdAmount);
-    if (isNaN(margin) || margin <= 0) { error('Enter a margin amount'); return; }
+    if (actualCost <= 0) { error('Enter an amount'); return; }
     if (assetQty <= 0) { error('Invalid amount'); return; }
     if (orderType === 'Limit') {
       const p = parseFloat(price);
       if (isNaN(p) || p <= 0) { error('Enter a valid entry price'); return; }
     }
+
+    /* Guard: warn if cost exceeds available balance */
+    const availableUsd = portfolio ? Number(portfolio.usd) / 100 : 0;
+    if (actualCost > availableUsd) {
+      error(`Insufficient balance. You have $${fmt(availableUsd)} available.`);
+      return;
+    }
+
     const spotSide: Side = direction === 'Long' ? 'Buy' : 'Sell';
     const err = await executeTx(
       () => orderType === 'Market'
@@ -217,7 +229,8 @@ export function TradeView({ mode = 'spot' }: TradeViewProps) {
       () => {
         addPosition({
           id: `${Date.now()}-${asset}`,
-          asset, direction, entryPrice, sizeQty: Number(contractQty), leverage, margin,
+          asset, direction, entryPrice, sizeQty: Number(contractQty), leverage,
+          margin: actualCost,
           openedAt: new Date().toLocaleTimeString(),
         });
         setUsdAmount('');
@@ -455,28 +468,32 @@ export function TradeView({ mode = 'spot' }: TradeViewProps) {
         )}
       </div>
 
-      {notional > 0 && entryPrice > 0 && (
+      {actualCost > 0 && entryPrice > 0 && (
         <div className={styles.positionPreview}>
           <div className={styles.previewRow}>
-            <span>Notional</span>
-            <span>${fmt(notional)}</span>
+            <span>USD Cost</span>
+            <span className={styles.positive}>${fmt(actualCost)}</span>
           </div>
           <div className={styles.previewRow}>
             <span>Size</span>
             <span>{fmt(assetQty, 5)} {asset}</span>
           </div>
+          {leverage > 1 && (
+            <div className={styles.previewRow}>
+              <span>Display Notional</span>
+              <span>${fmt(displayNotional)}</span>
+            </div>
+          )}
           <div className={styles.previewRow}>
             <span>Mark Price</span>
             <span>{fmtMark(markPrice)}</span>
           </div>
-          <div className={styles.previewRow}>
-            <span>Liq. Price</span>
-            <span className={styles.negative}>{fmtMark(estimatedLiqPrice)}</span>
-          </div>
-          <div className={styles.previewRow}>
-            <span>Required Margin</span>
-            <span>${fmt(parseFloat(usdAmount) || 0)}</span>
-          </div>
+          {estimatedLiqPrice > 0 && (
+            <div className={styles.previewRow}>
+              <span>Est. Liq. Price</span>
+              <span className={styles.negative}>{fmtMark(estimatedLiqPrice)}</span>
+            </div>
+          )}
         </div>
       )}
 

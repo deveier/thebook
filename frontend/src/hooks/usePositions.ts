@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
-const KEY = 'thebookdex:positions';
+const BASE_KEY = 'thebookdex:positions';
 
 export interface FuturesPosition {
   id: string;
@@ -13,28 +13,47 @@ export interface FuturesPosition {
   openedAt: string;
 }
 
-function load(): FuturesPosition[] {
+function loadFor(address: string): FuturesPosition[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(`${BASE_KEY}:${address}`);
     if (raw) return JSON.parse(raw);
   } catch {}
   return [];
 }
 
-function persist(positions: FuturesPosition[]) {
-  try { localStorage.setItem(KEY, JSON.stringify(positions.slice(-50))); } catch {}
+function persistFor(address: string, positions: FuturesPosition[]) {
+  try { localStorage.setItem(`${BASE_KEY}:${address}`, JSON.stringify(positions.slice(-50))); } catch {}
 }
 
-export function usePositions() {
-  const [positions, setPositions] = useState<FuturesPosition[]>(load);
+export function usePositions(address?: string) {
+  const [positions, setPositions] = useState<FuturesPosition[]>([]);
+
+  /* Reload positions whenever the connected wallet changes */
+  useEffect(() => {
+    if (address) {
+      setPositions(loadFor(address));
+    } else {
+      setPositions([]);
+    }
+  }, [address]);
 
   const addPosition = useCallback((p: FuturesPosition) => {
-    setPositions(prev => { const next = [...prev, p]; persist(next); return next; });
-  }, []);
+    if (!address) return;
+    setPositions(prev => {
+      const next = [...prev, p];
+      persistFor(address, next);
+      return next;
+    });
+  }, [address]);
 
   const removePosition = useCallback((id: string) => {
-    setPositions(prev => { const next = prev.filter(p => p.id !== id); persist(next); return next; });
-  }, []);
+    if (!address) return;
+    setPositions(prev => {
+      const next = prev.filter(p => p.id !== id);
+      persistFor(address, next);
+      return next;
+    });
+  }, [address]);
 
   const unrealizedPnl = useCallback((pos: FuturesPosition, markPrice: number): number => {
     if (!markPrice || !pos.entryPrice) return 0;
