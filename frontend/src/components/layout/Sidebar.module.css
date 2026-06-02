@@ -7,7 +7,7 @@
   height: 100vh;
   height: 100dvh;
   position: sticky;
-  top: 0;
+  top: var(--announcement-height, 34px);
   flex-shrink: 0;
   transition: width var(--transition-base);
 }

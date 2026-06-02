@@ -57,8 +57,8 @@
   display: flex;
   flex-direction: column;
   /* dvh accounts for browser chrome; fallback to svh then vh */
-  height: calc(100svh - var(--header-height) - var(--bottom-nav-height) - var(--space-sm) * 2);
-  height: calc(100dvh - var(--header-height) - var(--bottom-nav-height) - var(--space-sm) * 2);
+  height: calc(100svh - var(--announcement-height, 34px) - var(--header-height) - var(--bottom-nav-height) - var(--space-sm) * 2);
+  height: calc(100dvh - var(--announcement-height, 34px) - var(--header-height) - var(--bottom-nav-height) - var(--space-sm) * 2);
 }
 
 .mobileTabs {
@@ -833,6 +833,52 @@
   justify-content: center;
   line-height: 1;
 }
+
+/* ── Spot mode entry ── */
+.spotSideButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.spotBuyBtn {
+  background: var(--buy-green);
+  color: #fff;
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  min-height: 44px;
+  transition: all var(--transition-fast);
+}
+
+.spotSellBtn {
+  background: var(--sell-red);
+  color: #fff;
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  min-height: 44px;
+  transition: all var(--transition-fast);
+}
+
+.modeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: var(--space-sm);
+}
+
+.modeTagSpot    { background: rgba(14,203,129,0.12); color: var(--buy-green); }
+.modeTagFutures { background: rgba(246,70,93,0.12);  color: var(--sell-red);  }
 
 /* ── Mobile stats stacking ── */
 @media (max-width: 400px) {

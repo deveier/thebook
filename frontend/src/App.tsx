@@ -25,7 +25,9 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'trade':
-        return <TradeView />;
+        return <TradeView mode="spot" />;
+      case 'futures':
+        return <TradeView mode="futures" />;
       case 'swap':
         return <SwapView />;
       case 'pools':
@@ -35,7 +37,7 @@ function App() {
       case 'portfolio':
         return <PortfolioView />;
       default:
-        return <TradeView />;
+        return <TradeView mode="spot" />;
     }
   };
 

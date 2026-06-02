@@ -16,21 +16,17 @@ import { web3FromSource } from '@polkadot/extension-dapp';
 
 type PanelId = 'chart' | 'depth' | 'executions' | 'entry' | 'positions';
 
-const mobilePanels: { id: PanelId; label: string; icon: React.ElementType }[] = [
-  { id: 'chart',      label: 'Chart',      icon: BarChart3 },
-  { id: 'depth',      label: 'Depth',      icon: BookOpen },
-  { id: 'executions', label: 'Trades',     icon: ListOrdered },
-  { id: 'entry',      label: 'Trade',      icon: ShoppingCart },
-  { id: 'positions',  label: 'Positions',  icon: Layers },
-];
-
 const LEVERAGE_OPTIONS = [1, 2, 5, 10, 25];
 
 function fmt(n: number, decimals = 2) {
   return n.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-export function TradeView() {
+interface TradeViewProps {
+  mode?: 'spot' | 'futures';
+}
+
+export function TradeView({ mode = 'spot' }: TradeViewProps) {
   const [asset, setAsset]         = useState<Asset>('BTC');
   const [orderType, setOrderType] = useState<'Limit' | 'Market'>('Market');
   const [direction, setDirection] = useState<'Long' | 'Short'>('Long');
@@ -41,7 +37,12 @@ export function TradeView() {
   const [myOrders, setMyOrders]   = useState<any[]>([]);
   const [cancellingOid, setCancellingOid] = useState<number | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [side, setSide]           = useState<Side>('Buy');
+  const [qty, setQty]             = useState('');
   const { isMobile } = useViewport();
+
+  const isSpot    = mode === 'spot';
+  const isFutures = mode === 'futures';
 
   const priceAutoRef = useRef(false);
 
@@ -59,7 +60,6 @@ export function TradeView() {
   const change24h  = oracleData ? Number(oracleData.change_24h_bps) / 100 : 0;
   const lastExecPrice = tradesList.length > 0 ? tradesList[0].price : 0n;
 
-  /* ── Auto-fill price from mark price ── */
   useEffect(() => {
     priceAutoRef.current = false;
     if (markPrice > 0) { setPrice(markPrice.toFixed(2)); priceAutoRef.current = true; }
@@ -72,7 +72,6 @@ export function TradeView() {
     }
   }, [markPrice]);
 
-  /* ── Derived order values ── */
   const entryPrice = useMemo(() => {
     if (orderType === 'Market') return markPrice;
     const p = parseFloat(price);
@@ -94,7 +93,35 @@ export function TradeView() {
     return direction === 'Long' ? entryPrice * (1 - m) : entryPrice * (1 + m);
   }, [entryPrice, leverage, direction]);
 
-  /* ── My open orders ── */
+  const spotAvailableBalance = useMemo(() => {
+    if (!portfolio) return { value: 0n, label: '$0.00', decimals: 2 };
+    if (side === 'Sell') {
+      const amt = asset === 'BTC' ? portfolio.btc : asset === 'ETH' ? portfolio.eth : portfolio.vara;
+      return { value: amt, label: `${(Number(amt)/1e5).toFixed(5)}`, decimals: 5 };
+    }
+    return { value: portfolio.usd, label: `$${(Number(portfolio.usd)/100).toLocaleString()}`, decimals: 2 };
+  }, [portfolio, side, asset]);
+
+  function minDecimals(n: number): number {
+    if (n >= 1) return 3;
+    if (n >= 0.01) return 4;
+    return 5;
+  }
+
+  const applySpotPreset = (pct: number) => {
+    if (!portfolio) return;
+    const maxVal = spotAvailableBalance.value;
+    const divisor = 10 ** spotAvailableBalance.decimals;
+    const maxNumber = Number(maxVal) / divisor;
+    const preset = (maxNumber * pct) / 100;
+    const priceVal = orderType === 'Limit' ? parseFloat(price) : 0;
+    if (orderType === 'Limit' && side === 'Buy' && priceVal > 0) {
+      setQty((preset / priceVal).toFixed(minDecimals(preset / priceVal)));
+    } else {
+      setQty(preset.toFixed(minDecimals(preset)));
+    }
+  };
+
   const fetchMyOrders = useCallback(async () => {
     if (!program || !account) return;
     try {
@@ -127,14 +154,13 @@ export function TradeView() {
     finally { setCancellingOid(null); }
   }, [program, account, cancellingOid, error, success, refreshPortfolio, refreshAll, fetchMyOrders]);
 
-  /* ── Close a position (place reverse order) ── */
   const handleClosePosition = useCallback(async (pos: ReturnType<typeof usePositions>['positions'][0]) => {
     if (!program || !account) return;
-    const side = pos.direction === 'Long' ? 'Sell' : 'Buy';
+    const closeSide = pos.direction === 'Long' ? 'Sell' : 'Buy';
     const q = BigInt(pos.sizeQty);
     const p = BigInt(Math.max(1, Math.round(markPrice / 1000)));
     const err = await executeTx(
-      () => program!.orderbook.placeLimit(side as Side, pos.asset as Asset, p, q),
+      () => program!.orderbook.placeLimit(closeSide as Side, pos.asset as Asset, p, q),
       account,
       () => {
         removePosition(pos.id);
@@ -146,9 +172,35 @@ export function TradeView() {
     if (err) error(parseContractError(err));
   }, [program, account, markPrice, executeTx, removePosition, refreshPortfolio, refreshAll, success, error]);
 
-  /* ── Place order ── */
   const handlePlaceOrder = async () => {
     if (!program || !account) return;
+    if (pricesStalePer[asset] && !pricesLoading) await fetchPrice(asset);
+
+    if (isSpot) {
+      if (!qty) { error('Enter a quantity'); return; }
+      const parsedQty = parseFloat(qty);
+      if (isNaN(parsedQty) || parsedQty <= 0) { error('Invalid quantity'); return; }
+      if (orderType === 'Limit') {
+        const p = parseFloat(price);
+        if (isNaN(p) || p <= 0) { error('Enter a valid price'); return; }
+      }
+      const q = BigInt(Math.round(parsedQty * 1e5));
+      const err = await executeTx(
+        () => orderType === 'Market'
+          ? (side === 'Buy' ? program!.orderbook.marketBuy(asset, q) : program!.orderbook.marketSell(asset, q))
+          : program!.orderbook.placeLimit(side, asset, BigInt(Math.max(1, Math.round(parseFloat(price)/1000))), q),
+        account,
+        () => {
+          setQty('');
+          refreshPortfolio(); refreshAll(); fetchMyOrders();
+          success(`${side} order placed!`);
+          setTimeout(() => { refreshPortfolio(); refreshAll(); fetchMyOrders(); }, 2500);
+        }
+      );
+      if (err) error(parseContractError(err));
+      return;
+    }
+
     const margin = parseFloat(usdAmount);
     if (isNaN(margin) || margin <= 0) { error('Enter a margin amount'); return; }
     if (assetQty <= 0) { error('Invalid amount'); return; }
@@ -156,25 +208,16 @@ export function TradeView() {
       const p = parseFloat(price);
       if (isNaN(p) || p <= 0) { error('Enter a valid entry price'); return; }
     }
-    if (pricesStalePer[asset] && !pricesLoading) await fetchPrice(asset);
-
-    const side: Side = direction === 'Long' ? 'Buy' : 'Sell';
+    const spotSide: Side = direction === 'Long' ? 'Buy' : 'Sell';
     const err = await executeTx(
       () => orderType === 'Market'
-        ? (side === 'Buy'
-            ? program!.orderbook.marketBuy(asset, contractQty)
-            : program!.orderbook.marketSell(asset, contractQty))
-        : program!.orderbook.placeLimit(side, asset, contractPrice, contractQty),
+        ? (spotSide === 'Buy' ? program!.orderbook.marketBuy(asset, contractQty) : program!.orderbook.marketSell(asset, contractQty))
+        : program!.orderbook.placeLimit(spotSide, asset, contractPrice, contractQty),
       account,
       () => {
         addPosition({
           id: `${Date.now()}-${asset}`,
-          asset,
-          direction,
-          entryPrice,
-          sizeQty: Number(contractQty),
-          leverage,
-          margin,
+          asset, direction, entryPrice, sizeQty: Number(contractQty), leverage, margin,
           openedAt: new Date().toLocaleTimeString(),
         });
         setUsdAmount('');
@@ -185,13 +228,10 @@ export function TradeView() {
     );
     if (err) {
       const msg = parseContractError(err);
-      error(err.includes('NoLiquidity') || err.includes('NoBuyers')
-        ? `${msg} Use Limit order or Quick Demo to seed the book.`
-        : msg);
+      error(err.includes('NoLiquidity') || err.includes('NoBuyers') ? `${msg} Use Limit order or Quick Demo to seed the book.` : msg);
     }
   };
 
-  /* ── Quick Demo Trade ── */
   const executeDemoTrade = useCallback(async () => {
     if (!program || !account || !markPrice || demoLoading) return;
     setDemoLoading(true);
@@ -232,19 +272,38 @@ export function TradeView() {
 
   const fmtMark = (v: number) => v > 0 ? `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '---';
 
+  const spotMobilePanels: { id: PanelId; label: string; icon: React.ElementType }[] = [
+    { id: 'chart',      label: 'Chart',  icon: BarChart3 },
+    { id: 'depth',      label: 'Depth',  icon: BookOpen },
+    { id: 'executions', label: 'Trades', icon: ListOrdered },
+    { id: 'entry',      label: 'Trade',  icon: ShoppingCart },
+  ];
+
+  const futuresMobilePanels: { id: PanelId; label: string; icon: React.ElementType }[] = [
+    { id: 'chart',      label: 'Chart',      icon: BarChart3 },
+    { id: 'depth',      label: 'Depth',      icon: BookOpen },
+    { id: 'executions', label: 'Trades',     icon: ListOrdered },
+    { id: 'entry',      label: 'Open',       icon: ShoppingCart },
+    { id: 'positions',  label: 'Positions',  icon: Layers },
+  ];
+
+  const mobilePanels = isSpot ? spotMobilePanels : futuresMobilePanels;
+
   /* ────────────────── PANELS ────────────────── */
 
   const chartPanel = (
-    <Card title={`${asset}-PERP`} className={styles.fullHeight}>
+    <Card title={isSpot ? `${asset} / USD` : `${asset}-PERP`} className={styles.fullHeight}>
       <div className={styles.headerStats}>
         <div className={styles.assetSelector}>
           {(['BTC', 'ETH', 'VARA'] as Asset[]).map(a => (
-            <button key={a} className={asset === a ? styles.activeAsset : ''} onClick={() => setAsset(a)}>{a}-PERP</button>
+            <button key={a} className={asset === a ? styles.activeAsset : ''} onClick={() => setAsset(a)}>
+              {isSpot ? a : `${a}-PERP`}
+            </button>
           ))}
         </div>
         <div className={styles.marketStats}>
           <div className={styles.statItem}>
-            <span className={styles.statLabel}>Mark Price</span>
+            <span className={styles.statLabel}>{isSpot ? 'Oracle Price' : 'Mark Price'}</span>
             <span className={`${styles.statValue} ${change24h >= 0 ? styles.positive : styles.negative}`}>
               {fmtMark(markPrice)}
             </span>
@@ -255,10 +314,12 @@ export function TradeView() {
               {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
             </span>
           </div>
-          <div className={styles.statItem}>
-            <span className={styles.statLabel}>Funding Rate</span>
-            <span className={`${styles.statValue} ${styles.positive}`}>+0.0100%</span>
-          </div>
+          {isFutures && (
+            <div className={styles.statItem}>
+              <span className={styles.statLabel}>Funding Rate</span>
+              <span className={`${styles.statValue} ${styles.positive}`}>+0.0100%</span>
+            </div>
+          )}
           {lastExecPrice > 0n && (
             <div className={styles.statItem}>
               <span className={styles.statLabel}>Last Fill</span>
@@ -332,12 +393,10 @@ export function TradeView() {
     </Card>
   );
 
-  /* ── Entry Panel ── */
   const maxMargin = portfolio ? Number(portfolio.usd) / 100 : 0;
 
-  const entryPanel = (
+  const futuriesEntryPanel = (
     <Card title="Open Position">
-      {/* Direction */}
       <div className={styles.directionBtns}>
         <button className={`${styles.longBtn} ${direction === 'Long' ? '' : styles.inactive}`}
           onClick={() => setDirection('Long')}>
@@ -349,13 +408,11 @@ export function TradeView() {
         </button>
       </div>
 
-      {/* Order type */}
       <div className={styles.orderTypeTabs}>
         <button className={orderType === 'Market' ? styles.activeType : ''} onClick={() => setOrderType('Market')}>Market</button>
         <button className={orderType === 'Limit' ? styles.activeType : ''} onClick={() => setOrderType('Limit')}>Limit</button>
       </div>
 
-      {/* Leverage */}
       <div className={styles.leverageRow}>
         <span className={styles.leverageLabel}>Leverage</span>
         <div className={styles.leverageBtns}>
@@ -366,7 +423,6 @@ export function TradeView() {
         </div>
       </div>
 
-      {/* Limit price */}
       {orderType === 'Limit' && (
         <div className={styles.formGroup}>
           <label>Entry Price (USD)</label>
@@ -381,7 +437,6 @@ export function TradeView() {
         </div>
       )}
 
-      {/* Margin amount */}
       <div className={styles.formGroup}>
         <label>Margin (USD)</label>
         <input type="number" value={usdAmount} onChange={e => setUsdAmount(e.target.value)} placeholder="100" />
@@ -400,7 +455,6 @@ export function TradeView() {
         )}
       </div>
 
-      {/* Position preview */}
       {notional > 0 && entryPrice > 0 && (
         <div className={styles.positionPreview}>
           <div className={styles.previewRow}>
@@ -437,7 +491,6 @@ export function TradeView() {
       </button>
       {!account && <div className={styles.connectWarn}>Connect wallet to trade</div>}
 
-      {/* My open orders */}
       {account && myOrders.length > 0 && (
         <div className={styles.myOrders}>
           <div className={styles.myOrdersHeader}>Pending Orders ({myOrders.length})</div>
@@ -457,7 +510,88 @@ export function TradeView() {
     </Card>
   );
 
-  /* ── Positions Panel ── */
+  const spotEntryPanel = (
+    <Card title="Place Order">
+      <div className={styles.spotSideButtons}>
+        <button
+          className={`${styles.spotBuyBtn} ${side === 'Buy' ? '' : styles.inactive}`}
+          onClick={() => setSide('Buy')} aria-pressed={side === 'Buy'}>
+          Buy
+        </button>
+        <button
+          className={`${styles.spotSellBtn} ${side === 'Sell' ? '' : styles.inactive}`}
+          onClick={() => setSide('Sell')} aria-pressed={side === 'Sell'}>
+          Sell
+        </button>
+      </div>
+      <div className={styles.orderTypeTabs}>
+        <button className={orderType === 'Limit' ? styles.activeType : ''} onClick={() => setOrderType('Limit')}>Limit</button>
+        <button className={orderType === 'Market' ? styles.activeType : ''} onClick={() => setOrderType('Market')}>Market</button>
+      </div>
+      {orderType === 'Limit' && (
+        <div className={styles.formGroup}>
+          <label>Price (USD)</label>
+          <input type="number" value={price} onChange={e => { setPrice(e.target.value); priceAutoRef.current = false; }} placeholder="0.00" />
+          {markPrice > 0 && (
+            <div className={styles.inputHint} onClick={() => { setPrice(markPrice.toFixed(2)); priceAutoRef.current = true; }}>
+              Mark: {fmtMark(markPrice)}
+            </div>
+          )}
+        </div>
+      )}
+      <div className={styles.formGroup}>
+        <label>Quantity ({asset})</label>
+        <div className={styles.qtyRow}>
+          <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="0.00" />
+          {account && portfolio && (
+            <div className={styles.balanceTag} onClick={() => applySpotPreset(100)}>
+              Bal: {spotAvailableBalance.label}
+            </div>
+          )}
+        </div>
+        {account && portfolio && Number(spotAvailableBalance.value) > 0 && (
+          <div className={styles.presets}>
+            {[25, 50, 75, 100].map(pct => (
+              <button key={pct} className={styles.presetBtn} onClick={() => applySpotPreset(pct)}>{pct}%</button>
+            ))}
+          </div>
+        )}
+      </div>
+      {orderType === 'Limit' && (
+        <div className={styles.totalInfo}>
+          <span>Est. Total:</span>
+          <span>${((parseFloat(price||'0')*parseFloat(qty||'0'))||0).toFixed(2)}</span>
+        </div>
+      )}
+      <button
+        className={side === 'Buy' ? styles.submitBuy : styles.submitSell}
+        onClick={handlePlaceOrder}
+        disabled={txState.visible && txState.stage !== 'failed' && txState.stage !== 'confirmed'}>
+        {txState.stage === 'broadcasting' || txState.stage === 'confirming'
+          ? 'Processing...'
+          : orderType === 'Market' ? `Market ${side} ${asset}` : `${side} ${asset}`}
+      </button>
+      {!account && <div className={styles.connectWarn}>Connect wallet to trade</div>}
+      {account && myOrders.length > 0 && (
+        <div className={styles.myOrders}>
+          <div className={styles.myOrdersHeader}>Open Orders ({myOrders.length})</div>
+          {myOrders.slice(0, 5).map((o: any, i: number) => (
+            <div key={i} className={styles.myOrderRow}>
+              <span className={o[1]==='Buy' ? styles.buyText : styles.askText}>{String(o[1])} {String(o[2])}</span>
+              <span className={styles.myOrderPrice}>${(Number(o[3])*1000).toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+              <span className={styles.myOrderQty}>{(Number(o[4])/1e5).toFixed(4)}</span>
+              <button className={styles.cancelSmBtn} onClick={() => handleCancelOrder(o[0])} disabled={cancellingOid===Number(o[0])}>
+                {cancellingOid===Number(o[0]) ? '…' : '✕'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+
+  const entryPanel = isSpot ? spotEntryPanel : futuriesEntryPanel;
+
   const positionsPanel = (
     <Card title="My Positions" className={styles.fullHeight}>
       {positions.length === 0 ? (
@@ -543,7 +677,7 @@ export function TradeView() {
           {mobilePanel === 'depth'      && depthPanel}
           {mobilePanel === 'executions' && executionsPanel}
           {mobilePanel === 'entry'      && entryPanel}
-          {mobilePanel === 'positions'  && positionsPanel}
+          {mobilePanel === 'positions'  && isFutures && positionsPanel}
         </div>
         <TxStatusOverlay state={txState} onClose={resetTx} />
       </div>
@@ -556,7 +690,7 @@ export function TradeView() {
       <div className={styles.orderbookArea}>{depthPanel}</div>
       <div className={styles.entryArea}>
         {entryPanel}
-        <div style={{ marginTop: 'var(--space-sm)' }}>{positionsPanel}</div>
+        {isFutures && <div style={{ marginTop: 'var(--space-sm)' }}>{positionsPanel}</div>}
       </div>
       <div className={styles.tradesArea}>{executionsPanel}</div>
       <TxStatusOverlay state={txState} onClose={resetTx} />
