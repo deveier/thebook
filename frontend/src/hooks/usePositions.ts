@@ -15,26 +15,36 @@ export interface FuturesPosition {
 
 function loadFor(address: string): FuturesPosition[] {
   try {
-    const raw = localStorage.getItem(`${BASE_KEY}:${address}`);
-    if (raw) return JSON.parse(raw);
+    const walletKey = `${BASE_KEY}:${address}`;
+    const walletRaw = localStorage.getItem(walletKey);
+    if (walletRaw) return JSON.parse(walletRaw);
+
+    /* Migrate positions saved before wallet-scoping was introduced */
+    const legacyRaw = localStorage.getItem(BASE_KEY);
+    if (legacyRaw) {
+      localStorage.setItem(walletKey, legacyRaw);
+      localStorage.removeItem(BASE_KEY);
+      return JSON.parse(legacyRaw);
+    }
   } catch {}
   return [];
 }
 
 function persistFor(address: string, positions: FuturesPosition[]) {
-  try { localStorage.setItem(`${BASE_KEY}:${address}`, JSON.stringify(positions.slice(-50))); } catch {}
+  try {
+    localStorage.setItem(`${BASE_KEY}:${address}`, JSON.stringify(positions.slice(-50)));
+  } catch {}
 }
 
 export function usePositions(address?: string) {
-  const [positions, setPositions] = useState<FuturesPosition[]>([]);
+  /* Lazy initializer — loads immediately on first render if address is known */
+  const [positions, setPositions] = useState<FuturesPosition[]>(() =>
+    address ? loadFor(address) : []
+  );
 
-  /* Reload positions whenever the connected wallet changes */
+  /* Re-load whenever the connected wallet changes */
   useEffect(() => {
-    if (address) {
-      setPositions(loadFor(address));
-    } else {
-      setPositions([]);
-    }
+    setPositions(address ? loadFor(address) : []);
   }, [address]);
 
   const addPosition = useCallback((p: FuturesPosition) => {
