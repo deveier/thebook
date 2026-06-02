@@ -3,6 +3,10 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  /* Must not expand beyond its grid cell */
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 /* ── toolbar ── */
