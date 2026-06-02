@@ -40,10 +40,12 @@ interface MarketContextValue {
   pricesStale: boolean;
   pricesStalePer: Record<Asset, boolean>;
   pricesLoading: boolean;
+  tickLoading: boolean;
   priceHistory: PricePoint[];
   fetchPrices: () => Promise<void>;
   fetchPrice: (asset: Asset) => Promise<void>;
   refreshAll: () => void;
+  tickMarket: () => Promise<void>;
 }
 
 /* ── Helpers ── */
@@ -102,10 +104,12 @@ const MarketContext = createContext<MarketContextValue>({
   pricesStale: false,
   pricesStalePer: defaultStalePer,
   pricesLoading: false,
+  tickLoading: false,
   priceHistory: [],
   fetchPrices: async () => {},
   fetchPrice: async () => {},
   refreshAll: () => {},
+  tickMarket: async () => {},
 });
 
 export function useMarketData() {
@@ -126,6 +130,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
   const [lastFetched, setLastFetched] = useState<number | null>(null);
   const [lastFetchedPerAsset, setLastFetchedPerAsset] = useState<Record<Asset, number | null>>(defaultPerAsset);
   const [pricesLoading, setPricesLoading] = useState(false);
+  const [tickLoading, setTickLoading] = useState(false);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const fetchingRef = useRef(false);
   const initLoadedRef = useRef(false);
@@ -153,7 +158,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       setPrices(sp);
       if (timestamp) {
         setLastFetched(timestamp);
-        /* Seed per-asset from the shared timestamp (best-effort) */
         setLastFetchedPerAsset({ BTC: timestamp, ETH: timestamp, VARA: timestamp });
       }
       if (history.length) setPriceHistory(history);
@@ -183,7 +187,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       if (r.status === 'fulfilled') {
         const { asset, obResult, tradesResult } = r.value as { asset: Asset; obResult: any; tradesResult: any };
         if (obResult != null) {
-          /* sails-js may return the tuple as array OR as keyed object {0:[...],1:[...]} */
           const bidsRaw = Array.isArray(obResult) ? obResult[0] : (obResult as any)?.[0];
           const asksRaw = Array.isArray(obResult) ? obResult[1] : (obResult as any)?.[1];
           newOrderbooks[asset] = {
@@ -227,8 +230,13 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     };
   }, [program, fetchAll]);
 
-  /* refreshAll: call after any transaction */
-  const refreshAll = useCallback(() => { fetchAll(program); }, [fetchAll, program]);
+  /* refreshAll: rapid multi-refresh after any tx to catch blockchain latency */
+  const refreshAll = useCallback(() => {
+    fetchAll(program);
+    setTimeout(() => fetchAll(program), 1200);
+    setTimeout(() => fetchAll(program), 3000);
+    setTimeout(() => fetchAll(program), 6000);
+  }, [fetchAll, program]);
 
   /* ── Helper: append a price snapshot to history ── */
   const appendHistory = useCallback((merged: MarketPrices): PricePoint[] => {
@@ -313,6 +321,26 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     }
   }, [program, account, appendHistory]);
 
+  /* ── tickMarket: call Tick() to seed market maker activity ── */
+  const tickMarket = useCallback(async () => {
+    if (!program || !account || tickLoading) return;
+    setTickLoading(true);
+    try {
+      const { signer } = await web3FromSource(account.meta.source);
+      const tx = program.orderbook.tick();
+      await tx.withAccount(account.address, { signer }).calculateGas();
+      const { response } = await tx.signAndSend();
+      await response();
+      /* Refresh everything after tick */
+      await fetchAll(program);
+      setTimeout(() => fetchAll(program), 2000);
+    } catch (e) {
+      console.error('tick() failed:', e);
+    } finally {
+      setTickLoading(false);
+    }
+  }, [program, account, fetchAll, tickLoading]);
+
   return (
     <MarketContext.Provider value={{
       prices,
@@ -326,10 +354,12 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       pricesStale,
       pricesStalePer,
       pricesLoading,
+      tickLoading,
       priceHistory,
       fetchPrices,
       fetchPrice,
       refreshAll,
+      tickMarket,
     }}>
       {children}
     </MarketContext.Provider>

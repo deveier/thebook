@@ -160,9 +160,9 @@ export function PortfolioView() {
                 <div>
                   <span style={{ fontWeight: 600 }}>{o[1] as string} {o[2] as string}</span>
                   <span style={{ margin: '0 8px', color: 'var(--text-secondary)' }}>@</span>
-                  <span>${(Number(o[3]) / 100).toFixed(2)}</span>
+                  <span>${(Number(o[3]) * 1000).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                    Qty: {formatAmount(o[4], 8)} / Filled: {formatAmount(o[5], 8)}
+                    Qty: {formatAmount(o[4], 5)} / Filled: {formatAmount(o[5], 5)}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
