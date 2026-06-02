@@ -3,7 +3,7 @@ import { web3Accounts, web3Enable } from '@polkadot/extension-dapp';
 import { decodeAddress } from '@polkadot/util-crypto';
 import { u8aToHex } from '@polkadot/util';
 import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
-import { Wallet, UserPlus, Menu, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { Wallet, UserPlus, Menu, TrendingUp, TrendingDown, RefreshCw, LogOut } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import styles from './Header.module.css';
 import { usePortfolio } from '../../hooks/usePortfolio';
@@ -146,18 +146,21 @@ export function Header({ onMenuClick }: HeaderProps) {
           {account ? (
             <div className={styles.accountInfo}>
               {!portfolio && (
-                 <button onClick={handleJoin} className={styles.joinButton} disabled={loading}>
+                <button onClick={handleJoin} className={styles.joinButton} disabled={loading}>
                   <UserPlus size={16} />
-                  {loading ? 'Joining...' : isMobile ? 'Join' : 'Join DEX'}
+                  {loading ? '...' : 'Join'}
                 </button>
               )}
               {!isMobile && (
                 <span className={styles.address}>{account.decodedAddress.slice(0, 6)}...{account.decodedAddress.slice(-4)}</span>
               )}
-              {isMobile && (
-                <span className={styles.address}>{account.decodedAddress.slice(0, 4)}...{account.decodedAddress.slice(-2)}</span>
+              {isMobile ? (
+                <button onClick={logout} className={styles.iconBtn} aria-label="Disconnect wallet" title="Disconnect">
+                  <LogOut size={18} />
+                </button>
+              ) : (
+                <button onClick={logout} className={styles.connectButton}>Disconnect</button>
               )}
-              <button onClick={logout} className={styles.connectButton}>Disconnect</button>
             </div>
           ) : (
             <button onClick={handleConnect} className={styles.connectButton}>

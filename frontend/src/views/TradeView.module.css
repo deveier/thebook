@@ -48,32 +48,38 @@
 .mobileContainer {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - var(--header-height) - var(--bottom-nav-height) - var(--space-md) * 2);
+  /* dvh accounts for browser chrome; fallback to svh then vh */
+  height: calc(100svh - var(--header-height) - var(--bottom-nav-height) - var(--space-sm) * 2);
+  height: calc(100dvh - var(--header-height) - var(--bottom-nav-height) - var(--space-sm) * 2);
 }
 
 .mobileTabs {
   display: flex;
-  gap: var(--space-2xs);
+  gap: 4px;
   padding: 0;
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-xs);
   flex-shrink: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+
+.mobileTabs::-webkit-scrollbar { display: none; }
 
 .mobileTab {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
+  gap: 5px;
+  padding: 8px 12px;
   border-radius: var(--radius-md);
   background: var(--card-bg);
   color: var(--text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   transition: all var(--transition-fast);
-  min-height: 44px;
+  min-height: 40px;
+  flex-shrink: 0;
 }
 
 .mobileTab:hover {
@@ -87,12 +93,26 @@
   font-weight: 600;
 }
 
+/* Panel wraps each view — overflow-y allows entry to scroll when tall */
 .mobilePanel {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
+/* Children fill the space; they can grow taller (entry panel) and the panel scrolls */
 .mobilePanel > * {
+  min-height: 100%;
+  height: auto;
+}
+
+/* Chart/orderbook/trades should exactly fill the panel — no scroll needed */
+.mobilePanelFill {
+  overflow: hidden;
+}
+
+.mobilePanelFill > * {
   height: 100%;
 }
 

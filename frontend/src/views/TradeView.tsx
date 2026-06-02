@@ -595,7 +595,7 @@ export function TradeView() {
             );
           })}
         </div>
-        <div className={styles.mobilePanel}>
+        <div className={`${styles.mobilePanel} ${mobilePanel !== 'entry' ? styles.mobilePanelFill : ''}`}>
           {mobilePanel === 'chart' && chartPanel}
           {mobilePanel === 'orderbook' && orderbookPanel}
           {mobilePanel === 'trades' && tradesPanel}

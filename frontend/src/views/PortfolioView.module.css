@@ -19,9 +19,23 @@
 }
 
 @media (max-width: 767px) {
+  .container h1 {
+    font-size: var(--font-size-lg);
+  }
+
   .grid {
     grid-template-columns: 1fr;
-    gap: var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .table th,
+  .table td {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 13px;
+  }
+
+  .netWorthValue {
+    font-size: var(--font-size-xl);
   }
 }
 

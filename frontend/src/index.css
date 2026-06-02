@@ -162,6 +162,29 @@ input:focus, select:focus, textarea:focus {
   top: 8px;
 }
 
+/* ── Mobile global tweaks ── */
+@media (max-width: 767px) {
+  /* Prevent accidental horizontal scrolling */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Tighter base font on phones */
+  body {
+    font-size: clamp(13px, 3.5vw, 15px);
+  }
+
+  /* All buttons / inputs already have min-height 44px but double-check */
+  button, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Prevent input zoom on iOS (needs 16px font size in inputs) */
+  input, select, textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
 /* ── Reduced Motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

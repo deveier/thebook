@@ -3,14 +3,20 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: var(--bottom-nav-height);
+  /* height = nav bar + safe area for home indicator */
+  height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
   background: var(--card-bg);
   border-top: 1px solid var(--border-color);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-around;
   z-index: 200;
+  padding-top: var(--space-xs);
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* blur backdrop for a premium feel */
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  background: rgba(30, 35, 41, 0.94);
 }
 
 .item {

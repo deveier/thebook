@@ -19,10 +19,12 @@
   overflow-x: hidden;
 }
 
-/* Padding bottom for mobile bottom nav */
 @media (max-width: 767px) {
   .content {
-    padding-bottom: calc(var(--bottom-nav-height) + var(--space-md));
+    /* tight padding so views have max screen space */
+    padding: var(--space-sm);
+    /* clear fixed bottom nav + safe area */
+    padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-xs));
   }
 }
 

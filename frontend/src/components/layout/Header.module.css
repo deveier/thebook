@@ -173,8 +173,48 @@
   animation: spin360 1s linear infinite;
 }
 
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: var(--card-bg-hover);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.iconBtn:hover {
+  color: var(--sell-red);
+  border-color: var(--sell-red);
+}
+
 @media (max-width: 767px) {
   .header {
     padding: 0 var(--space-sm);
+    gap: var(--space-xs);
+  }
+
+  .logo {
+    font-size: var(--font-size-lg);
+  }
+
+  .accountInfo {
+    gap: var(--space-xs);
+  }
+
+  .joinButton {
+    padding: var(--space-2xs) var(--space-xs);
+    font-size: 12px;
+  }
+
+  .connectButton {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 12px;
   }
 }

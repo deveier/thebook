@@ -122,10 +122,30 @@
   }
 
   .nav {
-    padding: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    gap: 4px;
   }
 
   .navItem {
-    font-size: var(--font-size-base);
+    font-size: 14px;
+    min-height: 48px;
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .footer {
+    padding: var(--space-md);
+  }
+
+  .marketStatus {
+    padding: var(--space-sm) var(--space-md);
+    margin-bottom: 6px;
+  }
+
+  .label {
+    font-size: 11px;
+  }
+
+  .value {
+    font-size: 13px;
   }
 }
