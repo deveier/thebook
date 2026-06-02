@@ -1,5 +1,7 @@
 .bar {
   height: var(--announcement-height, 34px);
+  width: 100%;
+  max-width: 100%;
   background: linear-gradient(90deg, #003d22 0%, #006641 40%, #00b272 60%, #006641 80%, #003d22 100%);
   background-size: 300% 100%;
   animation: bgMove 12s ease infinite;
