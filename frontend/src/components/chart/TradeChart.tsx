@@ -197,9 +197,13 @@ export function TradeChart({ oraclePrice, bids, asks, asset }: TradeChartProps) 
   useEffect(() => {
     if (view !== 'price' || !containerRef.current) return;
 
-    const chart = createChart(containerRef.current, {
-      width:  containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight || 340,
+    const el = containerRef.current;
+    const w = el.clientWidth  || 600;
+    const h = el.clientHeight || 380;
+
+    const chart = createChart(el, {
+      width: w,
+      height: h,
       layout: {
         background: { type: ColorType.Solid, color: CHART_BG },
         textColor: '#848e9c',
@@ -212,7 +216,7 @@ export function TradeChart({ oraclePrice, bids, asks, asset }: TradeChartProps) 
         horzLine: { color: '#474d57', labelBackgroundColor: '#1e2329' },
       },
       timeScale: { borderColor: '#2b2f36', timeVisible: true, secondsVisible: false, fixLeftEdge: true, fixRightEdge: true },
-      rightPriceScale: { borderColor: '#2b2f36', minimumWidth: 72 },
+      rightPriceScale: { borderColor: '#2b2f36', minimumWidth: 68 },
       handleScroll: true,
       handleScale: true,
     });
@@ -225,26 +229,35 @@ export function TradeChart({ oraclePrice, bids, asks, asset }: TradeChartProps) 
 
     oracleRef.current = chart.addSeries(LineSeries, {
       color: PRIMARY, lineWidth: 1, lineStyle: LineStyle.Dashed,
-      lastValueVisible: true, priceLineVisible: false, title: 'Oracle',
+      lastValueVisible: true, priceLineVisible: false, title: 'Mark',
     });
 
     volRef.current = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' }, priceScaleId: 'volume',
     });
-    chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
+    chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
 
     chartRef.current = chart;
 
-    const onResize = () => {
-      if (containerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width:  containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight || 340,
-        });
+    /* ResizeObserver keeps the chart in sync with its CSS container */
+    const ro = new ResizeObserver(() => {
+      if (!containerRef.current || !chartRef.current) return;
+      const { clientWidth, clientHeight } = containerRef.current;
+      if (clientWidth > 0 && clientHeight > 0) {
+        chartRef.current.applyOptions({ width: clientWidth, height: clientHeight });
       }
-    };
-    window.addEventListener('resize', onResize);
-    return () => { window.removeEventListener('resize', onResize); chart.remove(); chartRef.current = null; };
+    });
+    ro.observe(el);
+
+    /* Force a layout pass so the chart measures correctly after grid paint */
+    requestAnimationFrame(() => {
+      if (containerRef.current && chartRef.current) {
+        const { clientWidth, clientHeight } = containerRef.current;
+        if (clientWidth > 0) chartRef.current.applyOptions({ width: clientWidth, height: clientHeight || 380 });
+      }
+    });
+
+    return () => { ro.disconnect(); chart.remove(); chartRef.current = null; };
   }, [view]);
 
   /* ── Update candlestick data ── */
@@ -256,7 +269,7 @@ export function TradeChart({ oraclePrice, bids, asks, asset }: TradeChartProps) 
 
     volRef.current.setData(ohlcData.map((d, i) => ({
       time: d.time, value: d.volume,
-      color: i > 0 && d.close >= d.open ? 'rgba(14,203,129,0.4)' : 'rgba(246,70,93,0.4)',
+      color: i > 0 && d.close >= d.open ? 'rgba(14,203,129,0.65)' : 'rgba(246,70,93,0.65)',
     })));
 
     if (oraclePrice > 0) {

@@ -62,19 +62,58 @@ function priceToUsd(feed: PriceFeed | null): number | null {
   return Number(feed.price_usd_micro) / 1_000_000;
 }
 
+async function fetchBinanceDirect(): Promise<Partial<MarketPrices>> {
+  try {
+    const res = await fetch(
+      'https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%5D',
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) return {};
+    const rows = await res.json() as Array<{ symbol: string; lastPrice: string; priceChangePercent: string }>;
+    const out: Partial<MarketPrices> = {};
+    for (const row of rows) {
+      const feed: PriceFeed = {
+        symbol: row.symbol.replace('USDT', ''),
+        price_usd_micro: Math.round(parseFloat(row.lastPrice) * 1_000_000),
+        change_24h_bps: Math.round(parseFloat(row.priceChangePercent) * 100),
+        market_cap_usd: 0,
+        volume_24h_usd: 0,
+        updated_at_block: 0,
+      };
+      if (row.symbol === 'BTCUSDT') out.BTC = feed;
+      if (row.symbol === 'ETHUSDT') out.ETH = feed;
+    }
+    return out;
+  } catch { return {}; }
+}
+
 async function loadSharedPrices(): Promise<{ prices: MarketPrices; timestamp: number | null; history: PricePoint[] }> {
   try {
     const res = await fetch(API_URL);
     if (res.ok) {
       const data = await res.json();
-      if (data.prices) return {
-        prices: data.prices,
-        timestamp: data.timestamp ?? null,
-        history: Array.isArray(data.history) ? data.history : [],
-      };
+      if (data.prices) {
+        let p: MarketPrices = data.prices;
+        /* If the API returned nulls (cold start), fill in from Binance directly */
+        if (!p.BTC || !p.ETH) {
+          const direct = await fetchBinanceDirect();
+          p = { ...p, ...direct };
+        }
+        return {
+          prices: p,
+          timestamp: data.timestamp ?? Date.now(),
+          history: Array.isArray(data.history) ? data.history : [],
+        };
+      }
     }
   } catch {}
-  return { prices: defaultPrices(), timestamp: null, history: [] };
+  /* API completely unreachable — go direct */
+  const direct = await fetchBinanceDirect();
+  return {
+    prices: { BTC: null, ETH: null, VARA: null, ...direct },
+    timestamp: Object.keys(direct).length ? Date.now() : null,
+    history: [],
+  };
 }
 
 async function saveSharedPrices(prices: MarketPrices, ts: number, history: PricePoint[]) {
@@ -156,12 +195,30 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     initLoadedRef.current = true;
     loadSharedPrices().then(({ prices: sp, timestamp, history }) => {
       setPrices(sp);
-      if (timestamp) {
-        setLastFetched(timestamp);
-        setLastFetchedPerAsset({ BTC: timestamp, ETH: timestamp, VARA: timestamp });
-      }
+      const ts = timestamp ?? Date.now();
+      setLastFetched(ts);
+      setLastFetchedPerAsset({ BTC: ts, ETH: ts, VARA: ts });
       if (history.length) setPriceHistory(history);
     });
+  }, []);
+
+  /* Refresh BTC+ETH prices directly from Binance every 60s — no wallet needed */
+  useEffect(() => {
+    const refresh = async () => {
+      const direct = await fetchBinanceDirect();
+      if (direct.BTC || direct.ETH) {
+        const ts = Date.now();
+        setPrices(prev => ({ ...prev, ...direct }));
+        setLastFetched(ts);
+        setLastFetchedPerAsset(prev => ({
+          ...prev,
+          ...(direct.BTC ? { BTC: ts } : {}),
+          ...(direct.ETH ? { ETH: ts } : {}),
+        }));
+      }
+    };
+    const id = setInterval(refresh, 60_000);
+    return () => clearInterval(id);
   }, []);
 
   /* Core market data fetch */

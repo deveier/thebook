@@ -1,7 +1,7 @@
 /* ── Desktop Grid (≥1024px) ── */
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px 310px;
+  grid-template-columns: minmax(0, 1fr) 200px 340px;
   grid-template-rows: 1fr 210px;
   grid-template-areas:
     "chart orderbook entry"
@@ -9,16 +9,14 @@
   gap: var(--space-sm);
   height: calc(100dvh - var(--header-height) - var(--announcement-height, 34px) - 64px);
   min-height: 0;
-  /* Prevent the grid itself from overflowing its container */
-  overflow: hidden;
 }
 
-/* Critical: grid items must declare min-width:0 or they ignore the column track size */
+/* min-width:0 forces grid items to respect their track sizes */
 .chartArea {
   grid-area: chart;
   min-height: 0;
-  min-width: 0;     /* ← prevents chart from blowing past its column */
-  overflow: hidden;
+  min-width: 0;
+  /* No overflow:hidden here — it clips the chart Y-axis and right edge */
 }
 .orderbookArea {
   grid-area: orderbook;
