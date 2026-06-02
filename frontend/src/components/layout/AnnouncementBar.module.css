@@ -1,0 +1,77 @@
+.bar {
+  height: var(--announcement-height, 34px);
+  background: linear-gradient(90deg, #003d22 0%, #006641 40%, #00b272 60%, #006641 80%, #003d22 100%);
+  background-size: 300% 100%;
+  animation: bgMove 12s ease infinite;
+  color: #e6fff5;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  letter-spacing: 0.01em;
+}
+
+.track {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.marquee {
+  display: flex;
+  width: max-content;
+  animation: scroll 55s linear infinite;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.marquee:hover {
+  animation-play-state: paused;
+}
+
+.marquee span {
+  padding: 0 60px;
+  flex-shrink: 0;
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  flex-shrink: 0;
+  color: rgba(230, 255, 245, 0.6);
+  cursor: pointer;
+  transition: color 0.15s;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.close:hover {
+  color: #e6fff5;
+}
+
+@keyframes scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes bgMove {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+
+@media (max-width: 767px) {
+  .bar {
+    height: var(--announcement-height, 30px);
+    font-size: 11px;
+  }
+  .marquee span { padding: 0 40px; }
+}

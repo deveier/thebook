@@ -1,8 +1,14 @@
-.container {
+.outerWrap {
   display: flex;
-  width: 100%;
+  flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
+}
+
+.container {
+  display: flex;
+  flex: 1;
+  width: 100%;
 }
 
 .main {

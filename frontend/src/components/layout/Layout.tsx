@@ -3,6 +3,7 @@ import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { Drawer } from './Drawer';
+import { AnnouncementBar } from './AnnouncementBar';
 import { useViewport } from '../../hooks/useViewport';
 import styles from './Layout.module.css';
 
@@ -17,6 +18,8 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
+    <div className={styles.outerWrap}>
+    <AnnouncementBar />
     <div className={styles.container}>
       <a href="#main-content" className="skip-link">
         Skip to content
@@ -36,6 +39,7 @@ export function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
           </Drawer>
         </>
       )}
+    </div>
     </div>
   );
 }

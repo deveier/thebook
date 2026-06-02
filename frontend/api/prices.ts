@@ -26,10 +26,12 @@ interface CacheEntry {
 }
 
 const MAX_HISTORY = 200;
-const COINGECKO_TTL = 5 * 60 * 1000; // 5 min
+const LIVE_TTL = 60 * 1000;       // 1-min live cache
+const VARA_TTL = 3 * 60 * 1000;   // 3-min for VARA (CoinGecko slower)
 
 let memCache: CacheEntry = { prices: { BTC: null, ETH: null, VARA: null }, timestamp: 0, history: [] };
-let cgCache: { prices: Prices; ts: number } | null = null;
+let liveCache: { prices: Prices; ts: number } | null = null;
+let varaCache: { feed: PriceFeed; ts: number } | null = null;
 
 /* ── Vercel KV ── */
 
@@ -59,37 +61,63 @@ async function kvSet(entry: CacheEntry): Promise<void> {
   } catch { /* ignore */ }
 }
 
-/* ── CoinGecko fallback (server-side only, no CORS issue) ── */
+/* ── Binance (BTC + ETH) ── */
 
-async function fetchCoinGecko(): Promise<Prices | null> {
+async function fetchBinance(): Promise<{ BTC: PriceFeed | null; ETH: PriceFeed | null }> {
   try {
-    if (cgCache && Date.now() - cgCache.ts < COINGECKO_TTL) return cgCache.prices;
     const res = await fetch(
-      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,vara-network&vs_currencies=usd&include_24hr_change=true',
+      'https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%5D',
+      { headers: { Accept: 'application/json' } }
+    );
+    if (!res.ok) return { BTC: null, ETH: null };
+    const data = await res.json() as Array<{ symbol: string; lastPrice: string; priceChangePercent: string }>;
+    const btcRow = data.find(d => d.symbol === 'BTCUSDT');
+    const ethRow = data.find(d => d.symbol === 'ETHUSDT');
+    return {
+      BTC: btcRow ? {
+        symbol: 'BTC',
+        price_usd_micro: Math.round(parseFloat(btcRow.lastPrice) * 1_000_000),
+        change_24h_bps: Math.round(parseFloat(btcRow.priceChangePercent) * 100),
+      } : null,
+      ETH: ethRow ? {
+        symbol: 'ETH',
+        price_usd_micro: Math.round(parseFloat(ethRow.lastPrice) * 1_000_000),
+        change_24h_bps: Math.round(parseFloat(ethRow.priceChangePercent) * 100),
+      } : null,
+    };
+  } catch { return { BTC: null, ETH: null }; }
+}
+
+/* ── CoinGecko (VARA only) ── */
+
+async function fetchVara(): Promise<PriceFeed | null> {
+  try {
+    if (varaCache && Date.now() - varaCache.ts < VARA_TTL) return varaCache.feed;
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=vara-network&vs_currencies=usd&include_24hr_change=true',
       { headers: { Accept: 'application/json' } }
     );
     if (!res.ok) return null;
     const data = await res.json() as Record<string, { usd?: number; usd_24h_change?: number }>;
-    const prices: Prices = {
-      BTC: data.bitcoin?.usd != null ? {
-        symbol: 'BTC',
-        price_usd_micro: Math.round(data.bitcoin.usd * 1_000_000),
-        change_24h_bps: Math.round((data.bitcoin.usd_24h_change ?? 0) * 100),
-      } : null,
-      ETH: data.ethereum?.usd != null ? {
-        symbol: 'ETH',
-        price_usd_micro: Math.round(data.ethereum.usd * 1_000_000),
-        change_24h_bps: Math.round((data.ethereum.usd_24h_change ?? 0) * 100),
-      } : null,
-      VARA: data['vara-network']?.usd != null ? {
-        symbol: 'VARA',
-        price_usd_micro: Math.round(data['vara-network'].usd * 1_000_000),
-        change_24h_bps: Math.round((data['vara-network'].usd_24h_change ?? 0) * 100),
-      } : null,
+    const v = data['vara-network'];
+    if (!v?.usd) return null;
+    const feed: PriceFeed = {
+      symbol: 'VARA',
+      price_usd_micro: Math.round(v.usd * 1_000_000),
+      change_24h_bps: Math.round((v.usd_24h_change ?? 0) * 100),
     };
-    cgCache = { prices, ts: Date.now() };
-    return prices;
+    varaCache = { feed, ts: Date.now() };
+    return feed;
   } catch { return null; }
+}
+
+async function fetchLivePrices(): Promise<Prices | null> {
+  if (liveCache && Date.now() - liveCache.ts < LIVE_TTL) return liveCache.prices;
+  const [binance, vara] = await Promise.all([fetchBinance(), fetchVara()]);
+  if (!binance.BTC && !binance.ETH && !vara) return null;
+  const prices: Prices = { BTC: binance.BTC, ETH: binance.ETH, VARA: vara };
+  liveCache = { prices, ts: Date.now() };
+  return prices;
 }
 
 function hasAnyPrice(prices: Prices): boolean {
@@ -117,19 +145,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  /* GET: KV → memCache → CoinGecko fallback */
-  let entry: CacheEntry | null = await kvGet();
-  if (!entry || !hasAnyPrice(entry.prices)) {
-    if (hasAnyPrice(memCache.prices)) {
-      entry = memCache;
-    } else {
-      const cg = await fetchCoinGecko();
-      if (cg) {
-        entry = { prices: cg, timestamp: Date.now(), history: [] };
-      }
-    }
+  /* GET: always try live prices first */
+  const live = await fetchLivePrices();
+  if (live && hasAnyPrice(live)) {
+    const kvEntry = await kvGet();
+    res.status(200).json({
+      prices: live,
+      timestamp: Date.now(),
+      history: kvEntry?.history ?? memCache.history,
+    });
+    return;
   }
 
+  /* Live feeds unavailable — fall back to KV / memCache */
+  let entry: CacheEntry | null = await kvGet();
+  if (!entry || !hasAnyPrice(entry.prices)) {
+    if (hasAnyPrice(memCache.prices)) entry = memCache;
+  }
   res.status(200).json({
     prices:    entry?.prices    ?? { BTC: null, ETH: null, VARA: null },
     timestamp: entry?.timestamp ?? null,

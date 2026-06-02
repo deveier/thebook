@@ -2,12 +2,13 @@
 .grid {
   display: grid;
   grid-template-columns: 1fr 190px 260px;
-  grid-template-rows: 1fr 220px;
+  grid-template-rows: 1fr 200px 160px;
   grid-template-areas:
     "chart orderbook entry"
-    "chart trades   entry";
+    "chart trades    entry"
+    "positions positions positions";
   gap: var(--space-sm);
-  height: calc(100vh - var(--header-height) - var(--space-xl) * 2);
+  height: calc(100dvh - var(--header-height) - var(--announcement-height, 34px) - var(--space-xl) * 2);
   min-height: 0;
 }
 
@@ -15,6 +16,7 @@
 .orderbookArea { grid-area: orderbook; min-height: 0; }
 .tradesArea    { grid-area: trades;    min-height: 0; }
 .entryArea     { grid-area: entry;     min-height: 0; overflow-y: auto; }
+.positionsArea { grid-area: positions; min-height: 0; }
 
 /* ── Tablet Landscape (1024–1199px) ── */
 @media (max-width: 1199px) and (min-width: 1024px) {
@@ -619,6 +621,213 @@
 
 .spin {
   animation: spin360 1s linear infinite;
+}
+
+/* ── Direction buttons ── */
+.directionBtns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.longBtn, .shortBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  transition: all var(--transition-fast);
+  min-height: 44px;
+}
+
+.longBtn  { background: var(--buy-green);  color: #fff; }
+.shortBtn { background: var(--sell-red);   color: #fff; }
+
+/* ── Leverage ── */
+.leverageRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.leverageLabel {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.leverageBtns {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.leverageBtn {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--card-bg-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  min-height: 28px;
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.leverageBtn:hover { color: var(--primary); border-color: var(--primary); }
+
+.leverageActive {
+  background: rgba(0,178,114,0.15) !important;
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+/* ── Position preview ── */
+.positionPreview {
+  background: var(--card-bg-hover);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.previewRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.previewRow span:first-child { color: var(--text-secondary); }
+.previewRow span:last-child  { font-family: var(--font-mono); font-weight: 600; }
+
+/* ── Submit Long / Short ── */
+.submitLong, .submitShort {
+  width: 100%;
+  padding: var(--space-md);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: var(--font-size-base);
+  letter-spacing: 0.02em;
+  transition: filter var(--transition-fast);
+  min-height: 48px;
+  margin-bottom: var(--space-sm);
+}
+
+.submitLong  { background: var(--buy-green); }
+.submitShort { background: var(--sell-red);  }
+.submitLong:hover:not(:disabled), .submitShort:hover:not(:disabled) { filter: brightness(1.1); }
+.submitLong:disabled, .submitShort:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Positions list ── */
+.positionsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.positionCard {
+  background: var(--card-bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.positionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.longTag, .shortTag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.longTag  { background: rgba(14,203,129,0.15); color: var(--buy-green); }
+.shortTag { background: rgba(246,70,93,0.15);  color: var(--sell-red);  }
+
+.closePositionBtn {
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 28px;
+  transition: all var(--transition-fast);
+}
+
+.closePositionBtn:hover:not(:disabled) {
+  border-color: var(--sell-red);
+  color: var(--sell-red);
+}
+
+.closePositionBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.positionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px 8px;
+}
+
+.positionGrid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.posLabel {
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.positionGrid span:last-child {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* ── Mobile badge ── */
+.badge {
+  background: var(--primary);
+  color: #000;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 /* ── Mobile stats stacking ── */
