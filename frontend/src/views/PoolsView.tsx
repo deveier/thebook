@@ -16,9 +16,13 @@ interface ManagedPool {
   myLp: number;
 }
 
-export function PoolsView() {
+interface PoolsViewProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export function PoolsView({ onNavigate }: PoolsViewProps) {
   const { program, account, isReady } = useSails();
-  const { pools, loading: marketLoading, refreshAll } = useMarketData();
+  const { pools, prices, orderbooks, loading: marketLoading, refreshAll } = useMarketData();
   const [myLp, setMyLp] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newA, setNewA] = useState<Asset>('BTC');
@@ -139,7 +143,73 @@ export function PoolsView() {
           </Card>
         )}
 
-        <Card title="Available Pools">
+        {/* ── USD Spot Pairs ── */}
+        <Card title="USD Spot Pairs — Orderbook Liquidity">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, padding: '4px 0' }}>
+            {(['BTC', 'ETH', 'VARA'] as Asset[]).map(asset => {
+              const feed    = prices[asset];
+              const markPrice = feed ? Number(feed.price_usd_micro) / 1_000_000 : 0;
+              const change  = feed ? Number(feed.change_24h_bps) / 100 : 0;
+              const ob      = orderbooks[asset] || { bids: [], asks: [] };
+              const bestBid = ob.bids.length > 0 ? Number(ob.bids[0][0]) * 1000 : 0;
+              const bestAsk = ob.asks.length > 0 ? Number(ob.asks[0][0]) * 1000 : 0;
+              const totalOrders = ob.bids.length + ob.asks.length;
+              return (
+                <div key={asset} style={{
+                  background: 'var(--card-bg-hover)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 14px',
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--primary)' }}>
+                      {asset}/USD
+                    </span>
+                    <span style={{ fontSize: 11, color: change >= 0 ? 'var(--buy-green)' : 'var(--sell-red)', fontWeight: 600 }}>
+                      {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
+                    {markPrice > 0 ? `$${markPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '---'}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+                    <div>
+                      <div style={{ marginBottom: 2 }}>Best Bid</div>
+                      <div style={{ color: 'var(--buy-green)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                        {bestBid > 0 ? `$${bestBid.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '---'}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ marginBottom: 2 }}>Best Ask</div>
+                      <div style={{ color: 'var(--sell-red)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                        {bestAsk > 0 ? `$${bestAsk.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '---'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: 6 }}>
+                    {totalOrders > 0 ? `${totalOrders} open orders` : 'No orders yet'}
+                  </div>
+                  <button
+                    onClick={() => onNavigate?.('trade')}
+                    style={{
+                      background: 'var(--primary)', color: '#000', borderRadius: 'var(--radius-sm)',
+                      fontWeight: 700, fontSize: 12, padding: '6px 0', minHeight: 32, cursor: 'pointer',
+                      border: 'none', width: '100%', marginTop: 2,
+                    }}
+                  >
+                    Provide Liquidity →
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 12, padding: '10px 12px', background: 'rgba(0,178,114,0.08)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            Provide orderbook liquidity by placing Buy + Sell limit orders around the current price on the Trade page. Earn the spread on every matched order.
+          </div>
+        </Card>
+
+        <Card title="AMM Pools">
           {pools.length === 0 && (
             <EmptyState
               title={marketLoading ? 'Loading...' : 'No Pools Yet'}

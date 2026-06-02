@@ -66,9 +66,9 @@ async function fetchBinanceDirect(): Promise<Partial<MarketPrices>> {
   try {
     const res = await fetch(
       'https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%5D',
-      { signal: AbortSignal.timeout(5000) }
+      { signal: AbortSignal.timeout(6000) }
     );
-    if (!res.ok) return {};
+    if (!res.ok) throw new Error('not ok');
     const rows = await res.json() as Array<{ symbol: string; lastPrice: string; priceChangePercent: string }>;
     const out: Partial<MarketPrices> = {};
     for (const row of rows) {
@@ -76,13 +76,36 @@ async function fetchBinanceDirect(): Promise<Partial<MarketPrices>> {
         symbol: row.symbol.replace('USDT', ''),
         price_usd_micro: Math.round(parseFloat(row.lastPrice) * 1_000_000),
         change_24h_bps: Math.round(parseFloat(row.priceChangePercent) * 100),
-        market_cap_usd: 0,
-        volume_24h_usd: 0,
-        updated_at_block: 0,
+        market_cap_usd: 0, volume_24h_usd: 0, updated_at_block: 0,
       };
       if (row.symbol === 'BTCUSDT') out.BTC = feed;
       if (row.symbol === 'ETHUSDT') out.ETH = feed;
     }
+    return out;
+  } catch {
+    /* Binance blocked or unavailable — try CoinGecko */
+    return fetchCoinGeckoDirect();
+  }
+}
+
+async function fetchCoinGeckoDirect(): Promise<Partial<MarketPrices>> {
+  try {
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,vara-network&vs_currencies=usd&include_24hr_change=true',
+      { signal: AbortSignal.timeout(10_000) }
+    );
+    if (!res.ok) return {};
+    const data = await res.json() as Record<string, { usd?: number; usd_24h_change?: number }>;
+    const make = (sym: string, usd: number, chg: number): PriceFeed => ({
+      symbol: sym,
+      price_usd_micro: Math.round(usd * 1_000_000),
+      change_24h_bps:  Math.round(chg * 100),
+      market_cap_usd: 0, volume_24h_usd: 0, updated_at_block: 0,
+    });
+    const out: Partial<MarketPrices> = {};
+    if (data.bitcoin?.usd)        out.BTC  = make('BTC',  data.bitcoin.usd,        data.bitcoin.usd_24h_change  ?? 0);
+    if (data.ethereum?.usd)       out.ETH  = make('ETH',  data.ethereum.usd,       data.ethereum.usd_24h_change ?? 0);
+    if (data['vara-network']?.usd) out.VARA = make('VARA', data['vara-network'].usd, data['vara-network'].usd_24h_change ?? 0);
     return out;
   } catch { return {}; }
 }

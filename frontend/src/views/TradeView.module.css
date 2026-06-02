@@ -284,7 +284,7 @@
 .headerStats {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   padding: var(--space-xs) 0 var(--space-sm);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
@@ -296,6 +296,38 @@
   gap: var(--space-md);
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* ── Mobile: stack selector above stats, scroll stats horizontally ── */
+@media (max-width: 767px) {
+  .headerStats {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 0 8px;
+  }
+
+  .assetSelector {
+    width: 100%;
+  }
+
+  .marketStats {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: var(--space-sm);
+    width: 100%;
+    padding-bottom: 2px;
+  }
+
+  .marketStats::-webkit-scrollbar { display: none; }
+
+  .statItem { flex-shrink: 0; }
+
+  .statLabel { font-size: 9px; }
+
+  .statValue { font-size: 12px; }
 }
 
 .statItem {

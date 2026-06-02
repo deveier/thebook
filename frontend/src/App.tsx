@@ -31,7 +31,7 @@ function App() {
       case 'swap':
         return <SwapView />;
       case 'pools':
-        return <PoolsView />;
+        return <PoolsView onNavigate={setActiveTab} />;
       case 'leaderboard':
         return <LeaderboardView />;
       case 'portfolio':

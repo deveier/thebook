@@ -39,23 +39,37 @@ const ohlcCache = new Map<string, { data: OHLCV[]; ts: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
 
 async function fetchBinance(symbol: string, interval: string, limit: number): Promise<OHLCV[]> {
-  const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
-  if (!r.ok) throw new Error('Binance error');
-  const raw: any[][] = await r.json();
-  return raw.map(k => ({
-    time: Math.floor(Number(k[0]) / 1000) as UTCTimestamp,
-    open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
-  }));
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 10_000);
+  try {
+    const r = await fetch(
+      `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+      { signal: ctrl.signal }
+    );
+    if (!r.ok) throw new Error('Binance error');
+    const raw: any[][] = await r.json();
+    return raw.map(k => ({
+      time: Math.floor(Number(k[0]) / 1000) as UTCTimestamp,
+      open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
+    }));
+  } finally { clearTimeout(t); }
 }
 
 async function fetchCoinGecko(coinId: string, days: number): Promise<OHLCV[]> {
-  const r = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}/ohlc?vs_currency=usd&days=${days}`);
-  if (!r.ok) throw new Error('CoinGecko error');
-  const raw: number[][] = await r.json();
-  return raw.map(k => ({
-    time: Math.floor(k[0] / 1000) as UTCTimestamp,
-    open: k[1], high: k[2], low: k[3], close: k[4], volume: 0,
-  }));
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12_000);
+  try {
+    const r = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${coinId}/ohlc?vs_currency=usd&days=${days}`,
+      { signal: ctrl.signal }
+    );
+    if (!r.ok) throw new Error('CoinGecko error');
+    const raw: number[][] = await r.json();
+    return raw.map(k => ({
+      time: Math.floor(k[0] / 1000) as UTCTimestamp,
+      open: k[1], high: k[2], low: k[3], close: k[4], volume: 0,
+    }));
+  } finally { clearTimeout(t); }
 }
 
 async function fetchMarketData(asset: string, tf: Timeframe): Promise<OHLCV[]> {
@@ -64,14 +78,17 @@ async function fetchMarketData(asset: string, tf: Timeframe): Promise<OHLCV[]> {
   if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
 
   const { interval, limit, cgDays } = TIMEFRAME_CONFIG[tf];
+  const binSym = BINANCE_SYMBOLS[asset];
+  const cgId   = COINGECKO_IDS[asset];
 
   let data: OHLCV[] = [];
-  const binSym = BINANCE_SYMBOLS[asset];
+
+  /* Try Binance first, fall back to CoinGecko on any failure */
   if (binSym) {
-    data = await fetchBinance(binSym, interval, limit);
-  } else {
-    const cgId = COINGECKO_IDS[asset];
-    if (cgId) data = await fetchCoinGecko(cgId, cgDays);
+    try { data = await fetchBinance(binSym, interval, limit); } catch { /* fallthrough */ }
+  }
+  if (data.length === 0 && cgId) {
+    try { data = await fetchCoinGecko(cgId, cgDays); } catch { /* fallthrough */ }
   }
 
   if (data.length > 0) ohlcCache.set(key, { data, ts: Date.now() });

@@ -28,7 +28,8 @@ interface TradeViewProps {
 
 export function TradeView({ mode = 'spot' }: TradeViewProps) {
   const [asset, setAsset]         = useState<Asset>('BTC');
-  const [orderType, setOrderType] = useState<'Limit' | 'Market'>('Market');
+  /* Futures defaults to Limit — market orders need the book seeded first */
+  const [orderType, setOrderType] = useState<'Limit' | 'Market'>(mode === 'futures' ? 'Limit' : 'Market');
   const [direction, setDirection] = useState<'Long' | 'Short'>('Long');
   const [leverage, setLeverage]   = useState(1);
   const [usdAmount, setUsdAmount] = useState('');
