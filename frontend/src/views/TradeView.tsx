@@ -554,9 +554,11 @@ export function TradeView() {
     <div className={styles.grid}>
       <div className={styles.chartArea}>{chartPanel}</div>
       <div className={styles.orderbookArea}>{depthPanel}</div>
-      <div className={styles.entryArea}>{entryPanel}</div>
+      <div className={styles.entryArea}>
+        {entryPanel}
+        <div style={{ marginTop: 'var(--space-sm)' }}>{positionsPanel}</div>
+      </div>
       <div className={styles.tradesArea}>{executionsPanel}</div>
-      <div className={styles.positionsArea}>{positionsPanel}</div>
       <TxStatusOverlay state={txState} onClose={resetTx} />
     </div>
   );

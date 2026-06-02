@@ -1,14 +1,15 @@
-/* ── Desktop Grid (≥1200px) ── */
+/* ── Desktop Grid (≥1024px) ── */
 .grid {
   display: grid;
-  grid-template-columns: 1fr 190px 260px;
-  grid-template-rows: 1fr 200px 160px;
+  /* chart flex-grows; orderbook and entry have sensible fixed widths */
+  grid-template-columns: minmax(0, 1fr) 200px 300px;
+  grid-template-rows: 1fr 210px;
   grid-template-areas:
     "chart orderbook entry"
-    "chart trades    entry"
-    "positions positions positions";
+    "chart trades    entry";
   gap: var(--space-sm);
-  height: calc(100dvh - var(--header-height) - var(--announcement-height, 34px) - var(--space-xl) * 2);
+  /* subtract header + bar + content padding (space-lg = 24px × 2 = 48px) */
+  height: calc(100dvh - var(--header-height) - var(--announcement-height, 34px) - 48px);
   min-height: 0;
 }
 
@@ -16,34 +17,18 @@
 .orderbookArea { grid-area: orderbook; min-height: 0; }
 .tradesArea    { grid-area: trades;    min-height: 0; }
 .entryArea     { grid-area: entry;     min-height: 0; overflow-y: auto; }
-.positionsArea { grid-area: positions; min-height: 0; }
-
-/* ── Tablet Landscape (1024–1199px) ── */
-@media (max-width: 1199px) and (min-width: 1024px) {
-  .grid {
-    grid-template-columns: 1fr 250px;
-    grid-template-rows: 1fr 1fr;
-    grid-template-areas:
-      "chart entry"
-      "orderbook trades";
-    gap: var(--space-sm);
-  }
-}
 
 /* ── Tablet Portrait (768–1023px) ── */
 @media (max-width: 1023px) and (min-width: 768px) {
   .grid {
-    grid-template-columns: 1fr 240px;
-    grid-template-rows: auto auto;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: minmax(300px, 1fr) minmax(200px, 1fr);
     grid-template-areas:
       "chart entry"
       "orderbook trades";
     height: auto;
-    min-height: calc(100vh - var(--header-height) - var(--space-xl) * 2);
-    gap: var(--space-sm);
+    min-height: calc(100dvh - var(--header-height) - var(--announcement-height, 34px) - 48px);
   }
-  .chartArea { min-height: 300px; }
-  .orderbookArea, .tradesArea { min-height: 200px; }
 }
 
 /* ── Mobile (<768px): tabbed panels ── */
@@ -735,19 +720,17 @@
 .positionsList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  overflow-y: auto;
-  flex: 1;
+  gap: 6px;
 }
 
 .positionCard {
   background: var(--card-bg-hover);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 6px;
 }
 
 .positionHeader {
@@ -791,7 +774,7 @@
 
 .positionGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 4px 8px;
 }
 
