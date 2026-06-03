@@ -298,36 +298,75 @@
   align-items: center;
 }
 
-/* ── Mobile: stack selector above stats, scroll stats horizontally ── */
+/* ── Mobile: two-row compact header ── */
 @media (max-width: 767px) {
   .headerStats {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 6px 0 8px;
+    align-items: stretch;
+    gap: 5px;
+    padding: 5px 0 6px;
   }
 
+  /* Asset buttons fill the full width equally */
   .assetSelector {
+    display: flex;
     width: 100%;
   }
 
+  .assetSelector button {
+    flex: 1;
+    min-height: 26px;
+    padding: 2px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  /* Stats row: each item gets an equal share of the width — no scrolling */
   .marketStats {
+    display: flex;
     flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    gap: var(--space-sm);
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 2px;
     width: 100%;
-    padding-bottom: 2px;
+    overflow: visible;
   }
 
-  .marketStats::-webkit-scrollbar { display: none; }
+  /* Each stat shrinks equally so all fit on one line */
+  .statItem {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 
-  .statItem { flex-shrink: 0; }
+  /* Tiny label — purely informational at this size */
+  .statLabel {
+    font-size: 7px;
+    margin-bottom: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+  }
 
-  .statLabel { font-size: 9px; }
+  /* Value: scaled to fill the stat item without overflow */
+  .statValue {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    gap: 1px;
+  }
 
-  .statValue { font-size: 12px; }
+  /* Refresh icon: tiny, no extra space */
+  .stalePriceBtn {
+    flex-shrink: 0;
+    min-height: unset;
+    padding: 0;
+    line-height: 1;
+  }
+
+  /* Stale hint text hidden — too small on mobile */
+  .staleHint { display: none; }
 }
 
 .statItem {
