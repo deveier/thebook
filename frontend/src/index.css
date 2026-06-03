@@ -116,21 +116,41 @@ input:focus, select:focus, textarea:focus {
   overflow-x: hidden;
 }
 
+/* ── Premium thin scrollbars (everywhere) ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+  background-clip: padding-box;
+}
+
 .scrollable {
   overflow-y: auto;
 }
 
-.scrollable::-webkit-scrollbar {
-  width: 4px;
-}
-
-.scrollable::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollable::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 2px;
+/* ── Brand text selection ── */
+::selection {
+  background: rgba(14, 203, 129, 0.28);
+  color: var(--text-main);
 }
 
 /* ── Utility Classes ── */

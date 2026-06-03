@@ -293,7 +293,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     if (leadersResult.status === 'fulfilled') setLeaders(leadersResult.value as LeaderEntry[]);
   }, []);
 
-  /* Initial load + 5s polling */
+  /* Initial load + 5s polling (paused while the tab is hidden to save RPC/battery) */
   useEffect(() => {
     if (!program) return;
     let active = true;
@@ -303,10 +303,16 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
       if (active) setLoading(false);
     };
     run();
-    pollRef.current = setInterval(() => { if (active) fetchAll(program); }, POLL_MS);
+    pollRef.current = setInterval(() => {
+      if (active && !document.hidden) fetchAll(program);
+    }, POLL_MS);
+    /* Catch up immediately when the user returns to the tab */
+    const onVisible = () => { if (active && !document.hidden) fetchAll(program); };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       active = false;
       if (pollRef.current) clearInterval(pollRef.current);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [program, fetchAll]);
 

@@ -106,12 +106,10 @@ export function useTxStatus(): UseTxStatusReturn {
 }
 
 export function TxStatusOverlay({ state, onClose }: { state: TxState; onClose: () => void }) {
-  if (!state.visible || state.stage === 'idle') return null;
-
   const confirmed = state.stage === 'confirmed';
   const failed = state.stage === 'failed';
-  const activeStepIndex = STEPS.findIndex(s => s.stage === state.stage);
 
+  /* Hook must run on every render — keep it above the early return (Rules of Hooks) */
   useEffect(() => {
     if (confirmed || failed) {
       const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -119,6 +117,10 @@ export function TxStatusOverlay({ state, onClose }: { state: TxState; onClose: (
       return () => window.removeEventListener('keydown', handler);
     }
   }, [confirmed, failed, onClose]);
+
+  if (!state.visible || state.stage === 'idle') return null;
+
+  const activeStepIndex = STEPS.findIndex(s => s.stage === state.stage);
 
   return (
     <div className={styles.overlay} onClick={failed || confirmed ? onClose : undefined}

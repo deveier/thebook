@@ -47,9 +47,12 @@ export function usePortfolio() {
       return;
     }
     fetchPortfolio();
-    pollRef.current = setInterval(fetchPortfolio, POLL_MS);
+    pollRef.current = setInterval(() => { if (!document.hidden) fetchPortfolio(); }, POLL_MS);
+    const onVisible = () => { if (!document.hidden) fetchPortfolio(); };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [isReady, account, fetchPortfolio]);
 

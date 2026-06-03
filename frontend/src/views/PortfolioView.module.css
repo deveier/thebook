@@ -34,6 +34,12 @@
     font-size: 13px;
   }
 
+  /* Hide the info-only Action column on phones to keep the table from overflowing */
+  .table th:last-child,
+  .table td:last-child {
+    display: none;
+  }
+
   .netWorthValue {
     font-size: var(--font-size-xl);
   }

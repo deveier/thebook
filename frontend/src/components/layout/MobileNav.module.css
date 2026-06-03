@@ -25,11 +25,11 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: var(--space-xs) var(--space-sm);
+  padding: var(--space-xs) 2px;
   color: var(--text-secondary);
   transition: color var(--transition-fast);
   min-height: 44px;
-  min-width: 44px;
+  min-width: 0;
   border-radius: var(--radius-sm);
   flex: 1;
   max-width: 80px;
@@ -47,4 +47,5 @@
   font-size: var(--font-size-xs);
   font-weight: 500;
   line-height: 1;
+  white-space: nowrap;
 }

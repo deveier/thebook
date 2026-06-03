@@ -116,14 +116,19 @@ export function TradeView({ mode = 'spot' }: TradeViewProps) {
 
   const applySpotPreset = (pct: number) => {
     if (!portfolio) return;
-    const maxVal = spotAvailableBalance.value;
-    const divisor = 10 ** spotAvailableBalance.decimals;
-    const maxNumber = Number(maxVal) / divisor;
+    const maxNumber = Number(spotAvailableBalance.value) / 10 ** spotAvailableBalance.decimals;
     const preset = (maxNumber * pct) / 100;
-    const priceVal = orderType === 'Limit' ? parseFloat(price) : 0;
-    if (orderType === 'Limit' && side === 'Buy' && priceVal > 0) {
-      setQty((preset / priceVal).toFixed(minDecimals(preset / priceVal)));
+    if (side === 'Buy') {
+      /* Buy balance is denominated in USD — convert to an asset quantity using
+         the limit price (Limit) or the mark price (Market). qty is always asset units. */
+      const px = orderType === 'Limit' ? parseFloat(price) : markPrice;
+      if (!px || px <= 0) { error(orderType === 'Limit' ? 'Enter a price first' : 'Price unavailable — refresh and retry'); return; }
+      /* Small buffer on market buys so book slippage doesn't trip InsufficientUsd */
+      const usable = orderType === 'Market' ? preset * 0.98 : preset;
+      const assetQty = usable / px;
+      setQty(assetQty.toFixed(minDecimals(assetQty)));
     } else {
+      /* Sell balance is already in asset units */
       setQty(preset.toFixed(minDecimals(preset)));
     }
   };

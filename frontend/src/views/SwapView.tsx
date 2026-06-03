@@ -1,7 +1,7 @@
 import { Card } from '../components/ui/Card';
 import { ArrowDown } from 'lucide-react';
 import styles from './SwapView.module.css';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSails } from '../hooks/useSails';
 import { useToast } from '../components/ui/Toast';
 import { parseContractError } from '../lib/errors';
@@ -11,20 +11,37 @@ import { useMarketData } from '../providers/MarketDataProvider';
 
 export function SwapView() {
   const { program, account } = useSails();
-  const { pools, loading: marketLoading, pricesStale, pricesLoading, fetchPrices, refreshAll } = useMarketData();
-  const [fromAsset, setFromAsset] = useState('VARA');
-  const [toAsset, setToAsset] = useState('ETH');
+  const { pools, prices, loading: marketLoading, pricesStale, pricesLoading, fetchPrices, refreshAll } = useMarketData();
+
+  const priceUsd = (a: Asset) => {
+    const f = prices[a];
+    return f ? Number(f.price_usd_micro) / 1_000_000 : 0;
+  };
+  const fmtUnits = (raw: bigint | number | string) =>
+    (Number(raw) / 1e5).toLocaleString(undefined, { maximumFractionDigits: 4 });
+  const poolTvlUsd = (p: Pool) =>
+    (Number(p.reserve_a) / 1e5) * priceUsd(p.asset_a) + (Number(p.reserve_b) / 1e5) * priceUsd(p.asset_b);
+  const fmtUsd = (v: number) =>
+    v > 0 ? `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '—';
+  const [fromAsset, setFromAsset] = useState<Asset>('VARA');
+  const [toAsset, setToAsset] = useState<Asset>('ETH');
   const [amountIn, setAmountIn] = useState('');
   const [amountOut, setAmountOut] = useState('');
   const [slippage, setSlippage] = useState(0.5);
   const { success, error } = useToast();
   const { txState, executeTx, resetTx } = useTxStatus();
 
-  const availAssets = [...new Set(pools.flatMap(p => [p.asset_a, p.asset_b]))];
+  const availAssets = useMemo(
+    () => [...new Set(pools.flatMap(p => [p.asset_a, p.asset_b]))],
+    [pools]
+  );
 
-  const activePool = pools.find(p =>
-    (p.asset_a === fromAsset && p.asset_b === toAsset) ||
-    (p.asset_a === toAsset && p.asset_b === fromAsset)
+  const activePool = useMemo(
+    () => pools.find(p =>
+      (p.asset_a === fromAsset && p.asset_b === toAsset) ||
+      (p.asset_a === toAsset && p.asset_b === fromAsset)
+    ),
+    [pools, fromAsset, toAsset]
   );
 
   const calculateOut = useCallback((inAmount: string) => {
@@ -43,6 +60,26 @@ export function SwapView() {
     const out = numerator / denominator;
     setAmountOut((Number(out) / 10**5).toFixed(5));
   }, [activePool, fromAsset]);
+
+  /* Keep the estimated output in sync with both assets, the amount, and live reserves */
+  useEffect(() => { calculateOut(amountIn); }, [calculateOut, amountIn]);
+
+  /* Default to a real pool on first load, then keep the pair valid (never From == To) */
+  const initRef = useRef(false);
+  useEffect(() => {
+    if (pools.length === 0) return;
+    if (!initRef.current) {
+      initRef.current = true;
+      setFromAsset(pools[0].asset_a);
+      setToAsset(pools[0].asset_b);
+      return;
+    }
+    if (!availAssets.includes(fromAsset)) { setFromAsset(availAssets[0]); return; }
+    if (toAsset === fromAsset || !availAssets.includes(toAsset)) {
+      const other = availAssets.find(a => a !== fromAsset);
+      if (other) setToAsset(other);
+    }
+  }, [pools, availAssets, fromAsset, toAsset]);
 
   const handleSwap = async () => {
     if (!program || !account || !activePool || !amountIn) return;
@@ -85,11 +122,11 @@ export function SwapView() {
             </div>
             <div className={styles.inputRow}>
               <input type="number" placeholder="0.00" className={styles.amountInput}
-                value={amountIn} onChange={e => { setAmountIn(e.target.value); calculateOut(e.target.value); }}
+                value={amountIn} onChange={e => setAmountIn(e.target.value)}
                 aria-label="Amount to swap from" />
-              <select value={fromAsset} onChange={e => { setFromAsset(e.target.value); setAmountOut(''); }}
+              <select value={fromAsset} onChange={e => setFromAsset(e.target.value as Asset)}
                 className={styles.assetSelect} aria-label="From asset">
-                {availAssets.map(a => <option key={a}>{a}</option>)}
+                {availAssets.filter(a => a !== toAsset).map(a => <option key={a}>{a}</option>)}
               </select>
             </div>
           </div>
@@ -105,9 +142,9 @@ export function SwapView() {
             <div className={styles.inputRow}>
               <input type="number" placeholder="0.00" className={styles.amountInput} readOnly value={amountOut}
                 aria-label="Estimated amount to receive" />
-              <select value={toAsset} onChange={e => setToAsset(e.target.value)}
+              <select value={toAsset} onChange={e => setToAsset(e.target.value as Asset)}
                 className={styles.assetSelect} aria-label="To asset">
-                {availAssets.map(a => <option key={a}>{a}</option>)}
+                {availAssets.filter(a => a !== fromAsset).map(a => <option key={a}>{a}</option>)}
               </select>
             </div>
           </div>
@@ -132,7 +169,7 @@ export function SwapView() {
             <div className={styles.priceInfo}>
               <div className={styles.infoRow}>
                 <span>Pool Reserves</span>
-                <span>{activePool.asset_a}: {Number(activePool.reserve_a) / 10**5} / {activePool.asset_b}: {Number(activePool.reserve_b) / 10**5}</span>
+                <span>{fmtUnits(activePool.reserve_a)} {activePool.asset_a} / {fmtUnits(activePool.reserve_b)} {activePool.asset_b}</span>
               </div>
             </div>
           )}
@@ -162,7 +199,7 @@ export function SwapView() {
             {pools.map(p => (
               <div key={p.id.toString()} className={styles.infoRow} style={{ padding: '8px 16px' }}>
                 <span>{p.asset_a} / {p.asset_b}</span>
-                <span>TVL: ${(Number(p.reserve_a) + Number(p.reserve_b)) / 10**5}</span>
+                <span>TVL: {fmtUsd(poolTvlUsd(p))}</span>
               </div>
             ))}
           </Card>

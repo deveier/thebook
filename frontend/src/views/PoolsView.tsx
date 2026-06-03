@@ -8,6 +8,8 @@ import { useViewport } from '../hooks/useViewport';
 import { useTxStatus, TxStatusOverlay } from '../components/ui/TxStatus';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useMarketData } from '../providers/MarketDataProvider';
+import { usePortfolio } from '../hooks/usePortfolio';
+import { web3FromSource } from '@polkadot/extension-dapp';
 
 type ModalMode = 'add' | 'remove';
 
@@ -16,13 +18,10 @@ interface ManagedPool {
   myLp: number;
 }
 
-interface PoolsViewProps {
-  onNavigate?: (tab: string) => void;
-}
-
-export function PoolsView({ onNavigate }: PoolsViewProps) {
+export function PoolsView() {
   const { program, account, isReady } = useSails();
   const { pools, prices, orderbooks, loading: marketLoading, refreshAll } = useMarketData();
+  const { portfolio, refresh: refreshPortfolio } = usePortfolio();
   const [myLp, setMyLp] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newA, setNewA] = useState<Asset>('BTC');
@@ -111,6 +110,78 @@ export function PoolsView({ onNavigate }: PoolsViewProps) {
     if (err) error(parseContractError(err));
   };
 
+  /* ── USD spot-pair liquidity (orderbook market-making) ── */
+  const [usdAsset, setUsdAsset] = useState<Asset | null>(null);
+  const [usdInput, setUsdInput] = useState('');
+  const [lpBusy, setLpBusy] = useState(false);
+
+  const usdMark = usdAsset && prices[usdAsset]
+    ? Number(prices[usdAsset]!.price_usd_micro) / 1_000_000 : 0;
+
+  const assetBal = (a: Asset) =>
+    portfolio ? Number(a === 'BTC' ? portfolio.btc : a === 'ETH' ? portfolio.eth : portfolio.vara) / 1e5 : 0;
+  const usdBal = portfolio ? Number(portfolio.usd) / 100 : 0;
+
+  const openUsdModal = (a: Asset) => { setUsdAsset(a); setUsdInput(''); };
+  const closeUsdModal = () => { if (!lpBusy) setUsdAsset(null); };
+
+  /* Two-sided quote levels for the current mark (contract price tick = $1000) */
+  const usdQuote = (() => {
+    if (usdMark <= 0) return null;
+    const markTick = Math.max(2, Math.round(usdMark / 1000));
+    const bidTick = Math.max(1, markTick - 1);
+    const askTick = markTick + 1;
+    return { bidTick, askTick, bidPriceUsd: bidTick * 1000, askPriceUsd: askTick * 1000 };
+  })();
+
+  const provideUsdLiquidity = async () => {
+    if (!program || !account || !usdAsset || !usdQuote) return;
+    const usd = parseFloat(usdInput);
+    if (isNaN(usd) || usd <= 0) { error('Enter a valid USD amount'); return; }
+
+    const halfUsd = usd / 2;
+    if (halfUsd > usdBal) {
+      error(`Insufficient USD. You have $${usdBal.toFixed(2)}, need $${halfUsd.toFixed(2)} for the bid side.`);
+      return;
+    }
+
+    const bidQty = BigInt(Math.max(1, Math.round((halfUsd / usdQuote.bidPriceUsd) * 1e5)));
+    const sellAssetQty = Math.min(halfUsd / usdQuote.askPriceUsd, assetBal(usdAsset));
+    const sellQty = sellAssetQty > 0 ? BigInt(Math.round(sellAssetQty * 1e5)) : 0n;
+
+    setLpBusy(true);
+    try {
+      const { signer } = await web3FromSource(account.meta.source);
+
+      /* Bid: resting buy below mark — provides USD-side liquidity */
+      const bt = program.orderbook.placeLimit('Buy', usdAsset, BigInt(usdQuote.bidTick), bidQty);
+      await bt.withAccount(account.address, { signer }).calculateGas();
+      const { response: br } = await bt.signAndSend();
+      const bres = await br();
+      if (bres && typeof bres === 'object' && 'err' in bres) throw new Error(JSON.stringify((bres as any).err));
+
+      /* Ask: resting sell above mark — provides asset-side liquidity (only if held) */
+      if (sellQty > 0n) {
+        const st = program.orderbook.placeLimit('Sell', usdAsset, BigInt(usdQuote.askTick), sellQty);
+        await st.withAccount(account.address, { signer }).calculateGas();
+        const { response: sr } = await st.signAndSend();
+        const sres = await sr();
+        if (sres && typeof sres === 'object' && 'err' in sres) throw new Error(JSON.stringify((sres as any).err));
+      }
+
+      success(sellQty > 0n
+        ? `Liquidity added · ${usdAsset}/USD two-sided quote is live`
+        : `Bid liquidity added · ${usdAsset}/USD`);
+      setUsdAsset(null);
+      refreshPortfolio(); refreshAll();
+      setTimeout(() => { refreshPortfolio(); refreshAll(); }, 2500);
+    } catch (e: any) {
+      error(parseContractError(e?.message || String(e)));
+    } finally {
+      setLpBusy(false);
+    }
+  };
+
   const fmt = (val: bigint | number | string) =>
     (Number(val) / 10**5).toLocaleString(undefined, { maximumFractionDigits: 6 });
 
@@ -191,21 +262,21 @@ export function PoolsView({ onNavigate }: PoolsViewProps) {
                     {totalOrders > 0 ? `${totalOrders} open orders` : 'No orders yet'}
                   </div>
                   <button
-                    onClick={() => onNavigate?.('trade')}
+                    onClick={() => openUsdModal(asset)}
                     style={{
                       background: 'var(--primary)', color: '#000', borderRadius: 'var(--radius-sm)',
                       fontWeight: 700, fontSize: 12, padding: '6px 0', minHeight: 32, cursor: 'pointer',
                       border: 'none', width: '100%', marginTop: 2,
                     }}
                   >
-                    Provide Liquidity →
+                    + Add Liquidity
                   </button>
                 </div>
               );
             })}
           </div>
           <div style={{ marginTop: 12, padding: '10px 12px', background: 'rgba(0,178,114,0.08)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            Provide orderbook liquidity by placing Buy + Sell limit orders around the current price on the Trade page. Earn the spread on every matched order.
+            USD pairs are orderbook markets. Adding liquidity places a resting Buy bid and Sell ask around the current price — you earn the spread whenever either side is matched.
           </div>
         </Card>
 
@@ -369,6 +440,78 @@ export function PoolsView({ onNavigate }: PoolsViewProps) {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── USD Pair Liquidity Modal ── */}
+      {usdAsset && (
+        <div className={styles.modalOverlay} onClick={closeUsdModal} role="dialog" aria-modal="true"
+          aria-label={`Add ${usdAsset}/USD liquidity`}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <h3>{usdAsset} / USD — Add Liquidity</h3>
+
+            <div className={styles.poolInfoBox}>
+              <span>Mark price: {usdMark > 0 ? `$${usdMark.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '---'}</span>
+              <span>Your USD: ${usdBal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+              <span>Your {usdAsset}: {assetBal(usdAsset).toLocaleString(undefined, { maximumFractionDigits: 5 })}</span>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Liquidity Amount (USD)</label>
+              <input
+                type="number"
+                value={usdInput}
+                onChange={e => setUsdInput(e.target.value)}
+                placeholder="100.00"
+                min="0"
+              />
+              {usdBal > 0 && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  {[25, 50, 100].map(pct => (
+                    <button key={pct} type="button"
+                      onClick={() => setUsdInput(((usdBal * pct) / 100).toFixed(2))}
+                      style={{
+                        flex: 1, background: 'var(--card-bg-hover)', border: '1px solid var(--border-color)',
+                        color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)', fontSize: 12,
+                        padding: '4px 0', minHeight: 30, cursor: 'pointer',
+                      }}>
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {usdQuote && parseFloat(usdInput) > 0 && (() => {
+              const half = parseFloat(usdInput) / 2;
+              const bidQty = half / usdQuote.bidPriceUsd;
+              const sellQty = Math.min(half / usdQuote.askPriceUsd, assetBal(usdAsset));
+              return (
+                <div className={styles.poolInfoBox}>
+                  <span style={{ color: 'var(--buy-green)' }}>
+                    Bid: buy {bidQty.toFixed(5)} {usdAsset} @ ${usdQuote.bidPriceUsd.toLocaleString()}
+                  </span>
+                  {sellQty > 0 ? (
+                    <span style={{ color: 'var(--sell-red)' }}>
+                      Ask: sell {sellQty.toFixed(5)} {usdAsset} @ ${usdQuote.askPriceUsd.toLocaleString()}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      Ask: skipped (no {usdAsset} balance) — bid-only liquidity
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className={styles.modalActions}>
+              <button className={styles.btnSecondary} onClick={closeUsdModal} disabled={lpBusy}>Cancel</button>
+              <button className={styles.btnPrimary} onClick={provideUsdLiquidity} disabled={lpBusy || !account || usdMark <= 0}>
+                {lpBusy ? 'Placing orders...' : 'Add Liquidity'}
+              </button>
+            </div>
+            {!account && <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center' }}>Connect wallet to provide liquidity</div>}
           </div>
         </div>
       )}

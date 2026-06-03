@@ -37,7 +37,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         .catch(() => {});
 
     fetch();
-    const id = setInterval(fetch, 10_000);
+    const id = setInterval(() => { if (!document.hidden) fetch(); }, 10_000);
     return () => { active = false; clearInterval(id); };
   }, [program, isReady]);
 

@@ -14,7 +14,7 @@ import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 export function PortfolioView() {
   const { portfolio, loading, join, refresh: refreshPortfolio } = usePortfolio();
   const { program, account, isReady } = useSails();
-  const { refreshAll } = useMarketData();
+  const { refreshAll, prices } = useMarketData();
   const [orders, setOrders] = useState<any[]>([]);
   const [cancelling, setCancelling] = useState<number | null>(null);
   const { success, error, info } = useToast();
@@ -84,11 +84,26 @@ export function PortfolioView() {
     );
   }
 
+  const priceUsd = (a: Asset) => {
+    const f = prices[a];
+    return f ? Number(f.price_usd_micro) / 1_000_000 : 0;
+  };
+
+  const usdVal  = Number(portfolio.usd) / 100;
+  const btcVal  = (Number(portfolio.btc)  / 1e5) * priceUsd('BTC');
+  const ethVal  = (Number(portfolio.eth)  / 1e5) * priceUsd('ETH');
+  const varaVal = (Number(portfolio.vara) / 1e5) * priceUsd('VARA');
+  const netWorth = usdVal + btcVal + ethVal + varaVal;
+  const pricesReady = priceUsd('BTC') > 0 || priceUsd('ETH') > 0;
+
+  /* "Open Orders" should only list orders still resting on the book */
+  const openOrders = orders.filter((o: any) => o[6] === 'Open' || o[6] === 'Partial');
+
   const assets = [
-    { name: 'USD',  amount: portfolio.usd,  decimals: 2 },
-    { name: 'BTC',  amount: portfolio.btc,  decimals: 5 },
-    { name: 'ETH',  amount: portfolio.eth,  decimals: 5 },
-    { name: 'VARA', amount: portfolio.vara, decimals: 5 },
+    { name: 'USD',  amount: portfolio.usd,  decimals: 2, value: usdVal },
+    { name: 'BTC',  amount: portfolio.btc,  decimals: 5, value: btcVal },
+    { name: 'ETH',  amount: portfolio.eth,  decimals: 5, value: ethVal },
+    { name: 'VARA', amount: portfolio.vara, decimals: 5, value: varaVal },
   ];
 
   return (
@@ -110,6 +125,7 @@ export function PortfolioView() {
                   <tr>
                     <th scope="col">Asset</th>
                     <th scope="col">Balance</th>
+                    <th scope="col">Value (USD)</th>
                     <th scope="col">Action</th>
                   </tr>
                 </thead>
@@ -118,6 +134,9 @@ export function PortfolioView() {
                     <tr key={asset.name}>
                       <td className={styles.assetName}>{asset.name}</td>
                       <td>{formatAmount(asset.amount, asset.decimals)}</td>
+                      <td>{asset.name === 'USD' || asset.value > 0
+                        ? `$${asset.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button className={styles.actionBtn} title={`Deposit ${asset.name}`}
@@ -140,22 +159,24 @@ export function PortfolioView() {
           <Card title="Total Net Worth">
               <div className={styles.netWorth}>
                   <span className={styles.netWorthValue}>
-                      ${formatAmount(portfolio.usd, 2)}
+                      ${netWorth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
-                  <span className={styles.netWorthLabel}>USD Balance</span>
+                  <span className={styles.netWorthLabel}>
+                      {pricesReady ? 'USD + assets at market price' : 'USD balance (connect for live asset prices)'}
+                  </span>
               </div>
           </Card>
         </div>
 
         <div className={styles.ordersSection}>
           <Card title="Open Orders">
-            {orders.length === 0 && (
+            {openOrders.length === 0 && (
               <EmptyState
                 title="No Open Orders"
                 description="Place a limit order on the Trade page to see it here."
               />
             )}
-            {orders.map((o, i) => (
+            {openOrders.map((o, i) => (
               <div key={i} className={styles.orderRow}>
                 <div>
                   <span style={{ fontWeight: 600 }}>{o[1] as string} {o[2] as string}</span>

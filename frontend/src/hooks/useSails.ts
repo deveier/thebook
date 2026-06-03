@@ -11,8 +11,6 @@ export function useSails() {
   useEffect(() => {
     if (isApiReady && api) {
       try {
-        console.log('Initializing SailsProgram with API and PID:', PROGRAM_ID);
-        // Initialize the Sails program client
         const p = new SailsProgram(api, PROGRAM_ID as `0x${string}`);
         setProgram(p);
       } catch (e) {
