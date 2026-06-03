@@ -322,50 +322,58 @@
     text-align: center;
   }
 
-  /* Stats row: each item gets an equal share of the width — no scrolling */
+  /* Stats row: all items in a single horizontal line */
   .marketStats {
     display: flex;
+    flex-direction: row;       /* explicit — no wrapping to column */
     flex-wrap: nowrap;
     justify-content: space-between;
     align-items: flex-start;
     gap: 2px;
     width: 100%;
-    overflow: visible;
   }
 
-  /* Each stat shrinks equally so all fit on one line */
+  /* Each stat takes an equal share of the row width */
   .statItem {
+    display: flex;
+    flex-direction: column;
     flex: 1 1 0;
     min-width: 0;
+    align-items: flex-start;
   }
 
-  /* Tiny label — purely informational at this size */
+  /* Label: tiny, one line */
   .statLabel {
     font-size: 7px;
     margin-bottom: 1px;
     white-space: nowrap;
+    width: 100%;
     overflow: hidden;
     text-overflow: clip;
   }
 
-  /* Value: scaled to fill the stat item without overflow */
+  /* Value: reduced to fit each column */
   .statValue {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
     font-size: 10px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     gap: 1px;
+    max-width: 100%;
   }
 
-  /* Refresh icon: tiny, no extra space */
+  /* Refresh button: small, no extra vertical space */
   .stalePriceBtn {
     flex-shrink: 0;
+    align-self: center;
     min-height: unset;
     padding: 0;
-    line-height: 1;
   }
 
-  /* Stale hint text hidden — too small on mobile */
+  /* Hide stale hint — no room on mobile */
   .staleHint { display: none; }
 }
 
