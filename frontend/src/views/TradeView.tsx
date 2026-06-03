@@ -305,47 +305,112 @@ export function TradeView({ mode = 'spot' }: TradeViewProps) {
 
   /* ────────────────── PANELS ────────────────── */
 
+  const mobileChartHeader = (
+    <div style={{ flexShrink: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: 6, marginBottom: 4 }}>
+      {/* Row 1: asset selector + refresh */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+        {(['BTC', 'ETH', 'VARA'] as Asset[]).map(a => (
+          <button
+            key={a}
+            onClick={() => setAsset(a)}
+            style={{
+              flex: 1,
+              padding: '3px 4px',
+              borderRadius: 6,
+              background: asset === a ? 'var(--primary)' : 'var(--card-bg-hover)',
+              color: asset === a ? '#000' : 'var(--text-secondary)',
+              fontWeight: 700,
+              fontSize: 11,
+              minHeight: 26,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {isSpot ? a : `${a}-P`}
+          </button>
+        ))}
+        <button onClick={() => fetchPrice(asset)} disabled={pricesLoading}
+          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', padding: 0, minHeight: 26, cursor: 'pointer', flexShrink: 0 }}>
+          <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} />
+        </button>
+      </div>
+      {/* Row 2: stats all in one horizontal line */}
+      <div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          <span style={{ fontSize: 7, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {isSpot ? 'Oracle' : 'Mark'}
+          </span>
+          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, color: change24h >= 0 ? 'var(--buy-green)' : 'var(--sell-red)', whiteSpace: 'nowrap' }}>
+            {fmtMark(markPrice)}
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          <span style={{ fontSize: 7, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>24h</span>
+          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, color: change24h >= 0 ? 'var(--buy-green)' : 'var(--sell-red)', whiteSpace: 'nowrap' }}>
+            {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
+          </span>
+        </div>
+        {isFutures && (
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            <span style={{ fontSize: 7, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fund</span>
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--buy-green)', whiteSpace: 'nowrap' }}>+0.01%</span>
+          </div>
+        )}
+        {lastExecPrice > 0n && (
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            <span style={{ fontSize: 7, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fill</span>
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+              ${fmt(Number(lastExecPrice) * 1000)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const chartPanel = (
     <Card title={isSpot ? `${asset} / USD` : `${asset}-PERP`} className={styles.fullHeight}>
-      <div className={styles.headerStats}>
-        <div className={styles.assetSelector}>
-          {(['BTC', 'ETH', 'VARA'] as Asset[]).map(a => (
-            <button key={a} className={asset === a ? styles.activeAsset : ''} onClick={() => setAsset(a)}>
-              {isSpot ? a : `${a}-PERP`}
+      {isMobile ? mobileChartHeader : (
+        <div className={styles.headerStats}>
+          <div className={styles.assetSelector}>
+            {(['BTC', 'ETH', 'VARA'] as Asset[]).map(a => (
+              <button key={a} className={asset === a ? styles.activeAsset : ''} onClick={() => setAsset(a)}>
+                {isSpot ? a : `${a}-PERP`}
+              </button>
+            ))}
+          </div>
+          <div className={styles.marketStats}>
+            <div className={styles.statItem}>
+              <span className={styles.statLabel}>{isSpot ? 'Oracle Price' : 'Mark Price'}</span>
+              <span className={`${styles.statValue} ${change24h >= 0 ? styles.positive : styles.negative}`}>
+                {fmtMark(markPrice)}
+              </span>
+            </div>
+            <div className={styles.statItem}>
+              <span className={styles.statLabel}>24h Change</span>
+              <span className={`${styles.statValue} ${change24h >= 0 ? styles.positive : styles.negative}`}>
+                {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
+              </span>
+            </div>
+            {isFutures && (
+              <div className={styles.statItem}>
+                <span className={styles.statLabel}>Funding Rate</span>
+                <span className={`${styles.statValue} ${styles.positive}`}>+0.0100%</span>
+              </div>
+            )}
+            {lastExecPrice > 0n && (
+              <div className={styles.statItem}>
+                <span className={styles.statLabel}>Last Fill</span>
+                <span className={styles.statValue}>${fmt(Number(lastExecPrice) * 1000)}</span>
+              </div>
+            )}
+            <button className={styles.stalePriceBtn} onClick={() => fetchPrice(asset)} disabled={pricesLoading}
+              title="Refresh mark price">
+              <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} />
             </button>
-          ))}
-        </div>
-        <div className={styles.marketStats}>
-          <div className={styles.statItem}>
-            <span className={styles.statLabel}>{isSpot ? 'Oracle Price' : 'Mark Price'}</span>
-            <span className={`${styles.statValue} ${change24h >= 0 ? styles.positive : styles.negative}`}>
-              {fmtMark(markPrice)}
-            </span>
           </div>
-          <div className={styles.statItem}>
-            <span className={styles.statLabel}>24h Change</span>
-            <span className={`${styles.statValue} ${change24h >= 0 ? styles.positive : styles.negative}`}>
-              {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
-            </span>
-          </div>
-          {isFutures && (
-            <div className={styles.statItem}>
-              <span className={styles.statLabel}>Funding Rate</span>
-              <span className={`${styles.statValue} ${styles.positive}`}>+0.0100%</span>
-            </div>
-          )}
-          {lastExecPrice > 0n && (
-            <div className={styles.statItem}>
-              <span className={styles.statLabel}>Last Fill</span>
-              <span className={styles.statValue}>${fmt(Number(lastExecPrice) * 1000)}</span>
-            </div>
-          )}
-          <button className={styles.stalePriceBtn} onClick={() => fetchPrice(asset)} disabled={pricesLoading}
-            title="Refresh mark price">
-            <RefreshCw size={12} className={pricesLoading ? styles.spin : ''} />
-          </button>
         </div>
-      </div>
+      )}
       <TradeChart trades={tradesList} oraclePrice={markPrice} priceHistory={priceHistory}
         bids={orderbook.bids} asks={orderbook.asks} asset={asset} />
     </Card>
